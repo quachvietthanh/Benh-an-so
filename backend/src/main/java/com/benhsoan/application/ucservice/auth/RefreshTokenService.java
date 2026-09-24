@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.session.SessionConfigurationProvider;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
@@ -31,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(noRollbackFor = TokenInvalidException.class)
 public class RefreshTokenService implements RefreshTokenUseCase {
 
-    private static final Duration SESSION_TIMEOUT = Duration.ofDays(7);
+    private static final Duration REFRESH_TOKEN_TIMEOUT = Duration.ofDays(7);
 
     private final UserRepository userRepository;
 
@@ -46,6 +47,8 @@ public class RefreshTokenService implements RefreshTokenUseCase {
     private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
 
     private final ClockPort clockPort;
+
+    private final SessionConfigurationProvider sessionConfigurationProvider;
 
     @Override
     public LoginResult refreshToken(
@@ -67,7 +70,7 @@ public class RefreshTokenService implements RefreshTokenUseCase {
 
         UserSession session = currentSession.get();
 
-        if (!session.isActive(now, SESSION_TIMEOUT)) {
+        if (!session.isActive(now, sessionConfigurationProvider.currentSettings().inactivityTimeout())) {
             throw new SessionExpiredException();
         }
 
@@ -84,7 +87,7 @@ public class RefreshTokenService implements RefreshTokenUseCase {
                         .orElseThrow(IllegalStateException::new);
 
         String refreshToken = refreshTokenGeneratorPort.generate();
-        session.rotateRefreshToken(tokenHashPort.hash(refreshToken), now.plus(SESSION_TIMEOUT), now);
+        session.rotateRefreshToken(tokenHashPort.hash(refreshToken), now.plus(REFRESH_TOKEN_TIMEOUT), now);
         userSessionRepository.save(session);
         String newToken = jwtTokenPort.generateToken(user.getId(), session.getId(), user.getUsername(), role.getName(),
                 role.getPermissions().stream().map(permission -> permission.getCode()).collect(java.util.stream.Collectors.toSet()));

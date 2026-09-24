@@ -90,7 +90,8 @@ public class UserSession {
             Instant now,
             Duration timeout
     ) {
-        return now.isAfter(lastUsedAt.plus(timeout));
+        Instant lastUsed = lastUsedAt != null ? lastUsedAt : createdAt;
+        return now.isAfter(lastUsed.plus(timeout));
     }
 
     public boolean isActive(

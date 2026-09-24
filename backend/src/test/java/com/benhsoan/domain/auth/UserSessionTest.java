@@ -128,4 +128,16 @@ class UserSessionTest {
         assertEquals(lastUsedAt, session.getLastUsedAt());
         assertFalse(session.isRevoked());
     }
+
+    @Test
+    @DisplayName("Idle timeout falls back to createdAt when lastUsedAt is null")
+    void idleTimeoutFallsBackToCreatedAtWhenLastUsedIsNull() {
+        Instant now = Instant.now();
+        UserSession session = UserSession.restore(
+                UUID.randomUUID(), UUID.randomUUID(), "hash", null,
+                now.plusSeconds(3600), now.minusSeconds(1800), null, null);
+
+        assertTrue(session.isIdleTimeout(now, Duration.ofMinutes(15)));
+        assertFalse(session.isActive(now, Duration.ofMinutes(15)));
+    }
 }

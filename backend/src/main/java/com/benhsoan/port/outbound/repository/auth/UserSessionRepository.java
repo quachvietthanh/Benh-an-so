@@ -4,6 +4,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.time.Instant;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.benhsoan.domain.auth.UserSession;
 public interface UserSessionRepository {
 
@@ -22,4 +25,10 @@ public interface UserSessionRepository {
     void deleteExpiredSessions();
 
     void revokeByUserId(UUID userId, Instant revokedAt);
+
+    void touchLastUsed(UUID sessionId, Instant lastUsedAt);
+
+    boolean revokeById(UUID sessionId, Instant revokedAt);
+
+    Page<UserSession> findAllByRevokedAtIsNull(Pageable pageable);
 }

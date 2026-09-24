@@ -18,7 +18,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.benhsoan.application.ucservice.session.SessionConfigurationProvider;
 import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.exception.ApiErrorResponseFactory;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
@@ -34,13 +36,16 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Duration REFRESH_SESSION_TIMEOUT = Duration.ofDays(7);
+    private static final Duration MIN_TOUCH_INTERVAL = Duration.ofSeconds(60);
 
     private final JwtTokenPort jwtTokenPort;
     private final UserSessionRepository userSessionRepository;
     private final UserRepository userRepository;
     private final ClockPort clockPort;
     private final ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SessionConfigurationProvider sessionConfigurationProvider;
 
     @org.springframework.beans.factory.annotation.Autowired
     public JwtAuthenticationFilter(
@@ -80,10 +85,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (token != null && jwtTokenPort.validate(token)) {
                 UUID userId = jwtTokenPort.getUserId(token);
                 Instant now = clockPort.now();
+                Duration inactivityTimeout = resolveInactivityTimeout();
 
-                boolean sessionIsActive = userSessionRepository.findById(jwtTokenPort.getSessionId(token))
-                        .filter(session -> session.getUserId().equals(userId))
-                        .filter(session -> session.isActive(now, REFRESH_SESSION_TIMEOUT))
+                Optional<UserSession> sessionOptional = userSessionRepository.findById(jwtTokenPort.getSessionId(token))
+                        .filter(session -> session.getUserId().equals(userId));
+
+                boolean sessionIsActive = sessionOptional
+                        .filter(session -> session.isActive(now, inactivityTimeout))
                         .isPresent();
 
                 Optional<User> userOptional = userRepository.findById(userId);
@@ -100,9 +108,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         return;
                     }
 
+                    UserSession session = sessionOptional.get();
+                    maybeTouchLastUsed(session, now, inactivityTimeout);
+
                     String username = jwtTokenPort.getUsername(token);
                     String role = jwtTokenPort.getRole(token);
-                    CurrentUserPrincipal principal = new CurrentUserPrincipal(userId, username);
+                    CurrentUserPrincipal principal = new CurrentUserPrincipal(userId, username, session.getId());
 
                     List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
@@ -135,6 +146,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 request,
                 response
         );
+    }
+
+    private Duration resolveInactivityTimeout() {
+        if (sessionConfigurationProvider == null) {
+            return Duration.ofMinutes(com.benhsoan.domain.clinic.ClinicConfiguration.DEFAULT_SESSION_TIMEOUT_MINUTES);
+        }
+        return sessionConfigurationProvider.currentSettings().inactivityTimeout();
+    }
+
+    private void maybeTouchLastUsed(UserSession session, Instant now, Duration inactivityTimeout) {
+        Duration interval = touchInterval(inactivityTimeout);
+        Instant base = session.getLastUsedAt() != null ? session.getLastUsedAt() : session.getCreatedAt();
+        if (!base.plus(interval).isAfter(now)) {
+            try {
+                userSessionRepository.touchLastUsed(session.getId(), now);
+            } catch (RuntimeException ignored) {
+                // Activity tracking must never break an otherwise-valid request.
+            }
+        }
+    }
+
+    private Duration touchInterval(Duration inactivityTimeout) {
+        Duration half = inactivityTimeout.dividedBy(2);
+        return half.compareTo(MIN_TOUCH_INTERVAL) < 0 ? half : MIN_TOUCH_INTERVAL;
     }
 
     private boolean isAllowedPathWhenMustChangePassword(HttpServletRequest request) {

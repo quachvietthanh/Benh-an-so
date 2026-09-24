@@ -41,6 +41,7 @@ import com.benhsoan.application.ucservice.auth.RefreshTokenService;
 import com.benhsoan.application.ucservice.auth.TwoFactorAuthenticationService;
 import com.benhsoan.application.ucservice.role.RolePermissionsResultMapper;
 import com.benhsoan.application.ucservice.role.UpdateRolePermissionsService;
+import com.benhsoan.application.ucservice.session.SessionConfigurationProvider;
 import com.benhsoan.config.SecurityConfig;
 import com.benhsoan.domain.reporting.enums.ReportType;
 import com.benhsoan.exception.GlobalExceptionHandler;
@@ -75,6 +76,7 @@ import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.PermissionRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.clinic.ClinicConfigurationRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 import com.benhsoan.domain.auth.Permission;
@@ -418,7 +420,8 @@ class ReportsSecurityIntegrationTest {
                 .andExpect(status().isOk());
 
         String refreshedAccessToken = new RefreshTokenService(userRepository, roleRepository, userSessionRepository,
-                jwtTokenPort, tokenHash, refreshTokenGenerator, clockPort)
+                jwtTokenPort, tokenHash, refreshTokenGenerator, clockPort,
+                new SessionConfigurationProvider(mock(ClinicConfigurationRepository.class)))
                 .refreshToken(new RefreshTokenCommand("refresh-old")).accessToken();
         assertEquals(Set.of("REPORT_VIEW"), tokenPermissions.get(refreshedAccessToken));
 

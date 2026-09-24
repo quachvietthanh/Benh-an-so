@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.request.clinic;
 
 import java.time.LocalTime;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,6 +29,13 @@ public record UpdateClinicConfigurationRequest(
         Integer retentionYears,
 
         @Min(value = 1, message = "Signing deadline hours must be at least 1.")
-        Integer signingDeadlineHours
+        Integer signingDeadlineHours,
+
+        @Min(value = 1, message = "Session timeout minutes must be at least 1.")
+        @Max(value = 1440, message = "Session timeout minutes must not exceed 1440.")
+        Integer sessionTimeoutMinutes,
+
+        @Min(value = 0, message = "Session warning minutes must be at least 0.")
+        Integer sessionWarningMinutes
 ) {
 }

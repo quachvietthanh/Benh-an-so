@@ -19,6 +19,13 @@ public class ClinicConfiguration {
     public static final int DEFAULT_SIGNING_DEADLINE_HOURS = 24;
     public static final int MIN_SIGNING_DEADLINE_HOURS = 1;
 
+    public static final int DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
+    public static final int MIN_SESSION_TIMEOUT_MINUTES = 1;
+    public static final int MAX_SESSION_TIMEOUT_MINUTES = 1440;
+
+    public static final int DEFAULT_SESSION_WARNING_MINUTES = 5;
+    public static final int MIN_SESSION_WARNING_MINUTES = 0;
+
     private static final int MAX_CLINIC_NAME_LENGTH = 150;
     private static final int MAX_ADDRESS_LENGTH = 500;
     private static final int MAX_PHONE_LENGTH = 30;
@@ -31,6 +38,8 @@ public class ClinicConfiguration {
     private LocalTime closingTime;
     private int retentionYears;
     private int signingDeadlineHours;
+    private int sessionTimeoutMinutes;
+    private int sessionWarningMinutes;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -43,6 +52,8 @@ public class ClinicConfiguration {
             LocalTime closingTime,
             int retentionYears,
             int signingDeadlineHours,
+            int sessionTimeoutMinutes,
+            int sessionWarningMinutes,
             Instant createdAt,
             Instant updatedAt
     ) {
@@ -58,6 +69,8 @@ public class ClinicConfiguration {
         validateWorkingHours(this.openingTime, this.closingTime);
         this.retentionYears = validateRetentionYears(retentionYears);
         this.signingDeadlineHours = validateSigningDeadlineHours(signingDeadlineHours);
+        this.sessionTimeoutMinutes = validateSessionTimeoutMinutes(sessionTimeoutMinutes);
+        this.sessionWarningMinutes = validateSessionWarningMinutes(sessionWarningMinutes, this.sessionTimeoutMinutes);
         this.createdAt = Guard.require(createdAt, "Created at");
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
@@ -95,8 +108,26 @@ public class ClinicConfiguration {
             int signingDeadlineHours,
             Instant now
     ) {
+        return create(clinicName, address, phone, openingTime, closingTime,
+                retentionYears, signingDeadlineHours,
+                DEFAULT_SESSION_TIMEOUT_MINUTES, DEFAULT_SESSION_WARNING_MINUTES, now);
+    }
+
+    public static ClinicConfiguration create(
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            int signingDeadlineHours,
+            int sessionTimeoutMinutes,
+            int sessionWarningMinutes,
+            Instant now
+    ) {
         return new ClinicConfiguration(
-                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, now, now
+                SINGLETON_ID, clinicName, address, phone, openingTime, closingTime,
+                retentionYears, signingDeadlineHours, sessionTimeoutMinutes, sessionWarningMinutes, now, now
         );
     }
 
@@ -139,8 +170,28 @@ public class ClinicConfiguration {
             Instant createdAt,
             Instant updatedAt
     ) {
+        return restore(id, clinicName, address, phone, openingTime, closingTime,
+                retentionYears, signingDeadlineHours,
+                DEFAULT_SESSION_TIMEOUT_MINUTES, DEFAULT_SESSION_WARNING_MINUTES, createdAt, updatedAt);
+    }
+
+    public static ClinicConfiguration restore(
+            int id,
+            String clinicName,
+            String address,
+            String phone,
+            LocalTime openingTime,
+            LocalTime closingTime,
+            int retentionYears,
+            int signingDeadlineHours,
+            int sessionTimeoutMinutes,
+            int sessionWarningMinutes,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
         return new ClinicConfiguration(
-                id, clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, createdAt, updatedAt
+                id, clinicName, address, phone, openingTime, closingTime,
+                retentionYears, signingDeadlineHours, sessionTimeoutMinutes, sessionWarningMinutes, createdAt, updatedAt
         );
     }
 
@@ -186,6 +237,16 @@ public class ClinicConfiguration {
         this.updatedAt = Guard.require(updatedAt, "Updated at");
     }
 
+    public void updateSessionSettings(
+            int sessionTimeoutMinutes,
+            int sessionWarningMinutes,
+            Instant updatedAt
+    ) {
+        this.sessionTimeoutMinutes = validateSessionTimeoutMinutes(sessionTimeoutMinutes);
+        this.sessionWarningMinutes = validateSessionWarningMinutes(sessionWarningMinutes, this.sessionTimeoutMinutes);
+        this.updatedAt = Guard.require(updatedAt, "Updated at");
+    }
+
     private static String normalizeRequired(String value, String field, int maxLength) {
         String normalized = Guard.require(value, field).trim().replaceAll("\\s+", " ");
         if (normalized.length() > maxLength) {
@@ -223,5 +284,21 @@ public class ClinicConfiguration {
             throw new ValidationException("Signing deadline hours must be at least " + MIN_SIGNING_DEADLINE_HOURS + ".");
         }
         return signingDeadlineHours;
+    }
+
+    private static int validateSessionTimeoutMinutes(int sessionTimeoutMinutes) {
+        if (sessionTimeoutMinutes < MIN_SESSION_TIMEOUT_MINUTES || sessionTimeoutMinutes > MAX_SESSION_TIMEOUT_MINUTES) {
+            throw new ValidationException("Session timeout minutes must be between "
+                    + MIN_SESSION_TIMEOUT_MINUTES + " and " + MAX_SESSION_TIMEOUT_MINUTES + ".");
+        }
+        return sessionTimeoutMinutes;
+    }
+
+    private static int validateSessionWarningMinutes(int sessionWarningMinutes, int sessionTimeoutMinutes) {
+        if (sessionWarningMinutes < MIN_SESSION_WARNING_MINUTES || sessionWarningMinutes >= sessionTimeoutMinutes) {
+            throw new ValidationException("Session warning minutes must be between "
+                    + MIN_SESSION_WARNING_MINUTES + " and less than the session timeout (" + sessionTimeoutMinutes + ").");
+        }
+        return sessionWarningMinutes;
     }
 }

@@ -49,6 +49,7 @@ final class DomainExceptionHttpStatusMapper {
                     ROLE_NOT_FOUND,
                     ROOM_NOT_FOUND,
                     SECURITY_ALERT_NOT_FOUND,
+                    SESSION_NOT_FOUND,
                     SERVICE_CATALOG_NOT_FOUND,
                     SPECIALTY_NOT_FOUND,
                     USER_NOT_FOUND,

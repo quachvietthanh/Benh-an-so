@@ -22,10 +22,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.benhsoan.application.ucservice.session.SessionConfigurationProvider;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.domain.auth.exception.TokenInvalidException;
+import com.benhsoan.domain.session.SessionSettings;
 import com.benhsoan.port.dto.command.auth.RefreshTokenCommand;
 import com.benhsoan.port.dto.result.LoginResult;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
@@ -50,6 +52,7 @@ class RefreshTokenServiceTest {
     @Mock private TokenHashPort tokenHashPort;
     @Mock private RefreshTokenGeneratorPort refreshTokenGeneratorPort;
     @Mock private ClockPort clockPort;
+    @Mock private SessionConfigurationProvider sessionConfigurationProvider;
     @Captor private ArgumentCaptor<UserSession> sessionCaptor;
     @InjectMocks private RefreshTokenService service;
 
@@ -60,6 +63,8 @@ class RefreshTokenServiceTest {
 
     @Test
     void rotatesCurrentTokenWithoutCreatingANewSession() {
+        when(sessionConfigurationProvider.currentSettings())
+                .thenReturn(new SessionSettings(Duration.ofMinutes(30), Duration.ofMinutes(5)));
         UserSession session = UserSession.create(USER_ID, "current-hash", NOW.plus(Duration.ofDays(7)));
         User user = User.restore(USER_ID, "admin", "hash", "Admin", "admin@example.com", null,
                 ROLE_ID, true, null, NOW.minus(Duration.ofDays(1)));

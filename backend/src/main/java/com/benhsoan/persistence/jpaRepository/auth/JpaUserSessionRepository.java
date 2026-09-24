@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -28,6 +30,24 @@ public interface JpaUserSessionRepository extends JpaRepository<UserSessionEntit
             where session.userId = :userId and session.revokedAt is null
             """)
     void revokeByUserId(@Param("userId") UUID userId, @Param("revokedAt") Instant revokedAt);
+
+    @Modifying
+    @Query("""
+            update UserSessionEntity session
+            set session.lastUsedAt = :lastUsedAt
+            where session.id = :sessionId and session.revokedAt is null
+            """)
+    void touchLastUsed(@Param("sessionId") UUID sessionId, @Param("lastUsedAt") Instant lastUsedAt);
+
+    @Modifying
+    @Query("""
+            update UserSessionEntity session
+            set session.revokedAt = :revokedAt
+            where session.id = :sessionId and session.revokedAt is null
+            """)
+    int revokeById(@Param("sessionId") UUID sessionId, @Param("revokedAt") Instant revokedAt);
+
+    Page<UserSessionEntity> findAllByRevokedAtIsNull(Pageable pageable);
 
     void deleteByRefreshExpiresAtBefore(Instant time);
 }

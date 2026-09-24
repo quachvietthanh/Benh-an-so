@@ -4,7 +4,10 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.persistence.entity.auth.UserSessionEntity;
@@ -64,6 +67,23 @@ public class UserSessionRepositoryAdapter implements UserSessionRepository {
     @Override
     public void revokeByUserId(UUID userId, Instant revokedAt) {
         jpaRepository.revokeByUserId(userId, revokedAt);
+    }
+
+    @Override
+    @Transactional
+    public void touchLastUsed(UUID sessionId, Instant lastUsedAt) {
+        jpaRepository.touchLastUsed(sessionId, lastUsedAt);
+    }
+
+    @Override
+    @Transactional
+    public boolean revokeById(UUID sessionId, Instant revokedAt) {
+        return jpaRepository.revokeById(sessionId, revokedAt) > 0;
+    }
+
+    @Override
+    public Page<UserSession> findAllByRevokedAtIsNull(Pageable pageable) {
+        return jpaRepository.findAllByRevokedAtIsNull(pageable).map(mapper::toDomain);
     }
 
     @Override

@@ -52,5 +52,9 @@ public enum ActionType {
 
     MERGE,
 
-    IMPORT
+    IMPORT,
+
+    SESSION_TERMINATE,
+
+    SESSION_EXTEND
 }

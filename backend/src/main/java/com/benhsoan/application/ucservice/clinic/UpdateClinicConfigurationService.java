@@ -39,23 +39,32 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
         }
 
         Instant now = clockPort.now();
-        int beforeRetentionYears = clinicConfigurationRepository.find()
-                .map(ClinicConfiguration::getRetentionYears)
-                .orElse(ClinicConfiguration.DEFAULT_RETENTION_YEARS);
+        ClinicConfiguration existing = clinicConfigurationRepository.find().orElse(null);
+
+        int beforeRetentionYears = existing != null ? existing.getRetentionYears() : ClinicConfiguration.DEFAULT_RETENTION_YEARS;
         int afterRetentionYears = command.retentionYears() != null
                 ? command.retentionYears()
                 : beforeRetentionYears;
 
-        int beforeSigningDeadlineHours = clinicConfigurationRepository.find()
-                .map(ClinicConfiguration::getSigningDeadlineHours)
-                .orElse(ClinicConfiguration.DEFAULT_SIGNING_DEADLINE_HOURS);
+        int beforeSigningDeadlineHours = existing != null ? existing.getSigningDeadlineHours() : ClinicConfiguration.DEFAULT_SIGNING_DEADLINE_HOURS;
         int afterSigningDeadlineHours = command.signingDeadlineHours() != null
                 ? command.signingDeadlineHours()
                 : beforeSigningDeadlineHours;
 
-        ClinicConfiguration configuration = clinicConfigurationRepository.find()
-                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, now))
-                .orElseGet(() -> ClinicConfiguration.create(
+        int beforeSessionTimeoutMinutes = existing != null ? existing.getSessionTimeoutMinutes() : ClinicConfiguration.DEFAULT_SESSION_TIMEOUT_MINUTES;
+        int afterSessionTimeoutMinutes = command.sessionTimeoutMinutes() != null
+                ? command.sessionTimeoutMinutes()
+                : beforeSessionTimeoutMinutes;
+
+        int beforeSessionWarningMinutes = existing != null ? existing.getSessionWarningMinutes() : ClinicConfiguration.DEFAULT_SESSION_WARNING_MINUTES;
+        int afterSessionWarningMinutes = command.sessionWarningMinutes() != null
+                ? command.sessionWarningMinutes()
+                : beforeSessionWarningMinutes;
+
+        ClinicConfiguration configuration = existing != null
+                ? update(existing, command, afterRetentionYears, afterSigningDeadlineHours,
+                        afterSessionTimeoutMinutes, afterSessionWarningMinutes, now)
+                : ClinicConfiguration.create(
                         command.clinicName(),
                         command.address(),
                         command.phone(),
@@ -63,12 +72,16 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                         command.closingTime(),
                         afterRetentionYears,
                         afterSigningDeadlineHours,
+                        afterSessionTimeoutMinutes,
+                        afterSessionWarningMinutes,
                         now
-                ));
+                );
 
         ClinicConfiguration saved = clinicConfigurationRepository.save(configuration);
         auditConfigurationUpdate(beforeRetentionYears, saved.getRetentionYears(),
-                beforeSigningDeadlineHours, saved.getSigningDeadlineHours(), now);
+                beforeSigningDeadlineHours, saved.getSigningDeadlineHours(),
+                beforeSessionTimeoutMinutes, saved.getSessionTimeoutMinutes(),
+                beforeSessionWarningMinutes, saved.getSessionWarningMinutes(), now);
 
         return resultMapper.toResult(saved);
     }
@@ -78,6 +91,8 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
             UpdateClinicConfigurationCommand command,
             int retentionYears,
             int signingDeadlineHours,
+            int sessionTimeoutMinutes,
+            int sessionWarningMinutes,
             Instant updatedAt
     ) {
         configuration.update(
@@ -90,22 +105,23 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 signingDeadlineHours,
                 updatedAt
         );
+        configuration.updateSessionSettings(sessionTimeoutMinutes, sessionWarningMinutes, updatedAt);
         return configuration;
     }
 
     private void auditConfigurationUpdate(
             int beforeRetentionYears, int afterRetentionYears,
             int beforeSigningDeadlineHours, int afterSigningDeadlineHours,
+            int beforeSessionTimeoutMinutes, int afterSessionTimeoutMinutes,
+            int beforeSessionWarningMinutes, int afterSessionWarningMinutes,
             Instant now
     ) {
         UUID actorId = currentUserPort.getCurrentUserId();
         String detail = """
-                {"before":{"retentionYears":%d,"signingDeadlineHours":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d},"summary":"Clinic configuration updated; retentionYears changed from %d to %d; signingDeadlineHours changed from %d to %d"}
+                {"before":{"retentionYears":%d,"signingDeadlineHours":%d,"sessionTimeoutMinutes":%d,"sessionWarningMinutes":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d,"sessionTimeoutMinutes":%d,"sessionWarningMinutes":%d},"summary":"Clinic configuration updated"}
                 """.formatted(
-                beforeRetentionYears, beforeSigningDeadlineHours,
-                afterRetentionYears, afterSigningDeadlineHours,
-                beforeRetentionYears, afterRetentionYears,
-                beforeSigningDeadlineHours, afterSigningDeadlineHours
+                beforeRetentionYears, beforeSigningDeadlineHours, beforeSessionTimeoutMinutes, beforeSessionWarningMinutes,
+                afterRetentionYears, afterSigningDeadlineHours, afterSessionTimeoutMinutes, afterSessionWarningMinutes
         ).trim();
 
         auditLogRepository.save(AuditLog.create(

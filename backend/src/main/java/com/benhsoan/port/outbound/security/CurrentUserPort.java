@@ -7,6 +7,8 @@ public interface CurrentUserPort {
 
     UUID getCurrentUserId();
 
+    UUID getCurrentSessionId();
+
     Set<String> getCurrentUserRoles();
     
     boolean hasRole(String role);

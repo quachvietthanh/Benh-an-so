@@ -130,6 +130,9 @@ public class SecurityConfig {
                                                 .requestMatchers("/doctor-room-assignments/**").authenticated()
                                                 .requestMatchers("/doctors/*/room-assignment").authenticated()
 
+                                                // ===== SESSION MANAGEMENT =====
+                                                .requestMatchers("/sessions/**").authenticated()
+
                                                 // ===== OTHERS =====
                                                 .anyRequest().authenticated())
 
