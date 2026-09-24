@@ -27,11 +27,13 @@ Chức năng cung cấp các điểm cuối (endpoints) cho phép Dược sĩ xe
 | `/inventory/procurements/{id}/reject` | `POST` | Từ chối phiếu dự trù (`PENDING_APPROVAL`) | `MEDICATION_PROCUREMENT_APPROVE` | `MANAGER`, `ADMIN` |
 
 > [!NOTE]
-> Người dùng mang vai trò `RECEPTIONIST`, `DOCTOR`, hoặc `PATIENT` không có bất kỳ quyền nào trong bảng trên. Khi truy cập sẽ nhận mã lỗi `403 Forbidden` và hệ thống tự động ghi nhận nhật ký `ACCESS_DENIED` vào `audit_logs` (`TC-03`).
+> - **Phân quyền 2 tầng (Defense-in-Depth)**: Quyền truy cập được bảo vệ kép tại cả tầng Web Controller (`@RequirePermission`) và tầng Application Service (`MedicationProcurementAuthorizer`).
+> - Người dùng mang vai trò `RECEPTIONIST`, `DOCTOR`, hoặc `PATIENT` không có bất kỳ quyền nào trong bảng trên. Khi truy cập sẽ nhận mã lỗi `403 Forbidden` và hệ thống tự động ghi nhận nhật ký `ACCESS_DENIED` vào `audit_logs` (`TC-03`).
 
 ### 1.2. Quy tắc Phân tách nhiệm vụ (Separation of Duties - SoD)
 - Người tạo phiếu (`createdBy`) **tuyệt đối không được phép tự phê duyệt hoặc tự từ chối phiếu** của chính mình, kể cả khi tài khoản đó có quyền `MEDICATION_PROCUREMENT_APPROVE` (hoặc vai trò `ADMIN`).
-- Nếu vi phạm, hệ thống ném ngoại lệ `SelfProcurementApprovalNotAllowedException` và trả về mã lỗi `403 Forbidden`.
+- Khi phát hiện vi phạm SoD, hệ thống tự động ghi nhận nhật ký kiểm toán `ActionType.ACCESS_DENIED` qua transaction độc lập (`REQUIRES_NEW`) với action `APPROVE_DENIED_SOD` (đối với duyệt) hoặc `REJECT_DENIED_SOD` (đối với từ chối) để bảo đảm không bị mất log khi transaction chính bị rollback.
+- Sau đó hệ thống ném ngoại lệ `SelfProcurementApprovalNotAllowedException` và trả về mã lỗi `403 Forbidden` (`SELF_APPROVAL_NOT_ALLOWED`).
 
 ### 1.3. Quy tắc Bất biến chứng từ (Data Immutability)
 - Khi phiếu đã ở trạng thái `APPROVED` hoặc `REJECTED`, phiếu không thể bị sửa đổi, xóa, hủy hoặc duyệt lại. Mọi thao tác thay đổi trạng thái sẽ trả về lỗi `409 Conflict`.

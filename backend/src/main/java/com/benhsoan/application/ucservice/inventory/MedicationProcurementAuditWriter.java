@@ -32,11 +32,27 @@ public class MedicationProcurementAuditWriter {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void writeSoDDenied(UUID actorId, UUID planId, String planCode, Instant now) {
+        writeApproveSoDDenied(actorId, planId, planCode, now);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void writeApproveSoDDenied(UUID actorId, UUID planId, String planCode, Instant now) {
+        writeSoDDeniedInternal(actorId, planId, planCode, "APPROVE_DENIED_SOD",
+                "Người lập phiếu không được phép tự duyệt phiếu của chính mình", now);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void writeRejectSoDDenied(UUID actorId, UUID planId, String planCode, Instant now) {
+        writeSoDDeniedInternal(actorId, planId, planCode, "REJECT_DENIED_SOD",
+                "Người lập phiếu không được phép tự từ chối phiếu của chính mình", now);
+    }
+
+    private void writeSoDDeniedInternal(UUID actorId, UUID planId, String planCode, String action, String reason, Instant now) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("action", "APPROVE_DENIED_SOD");
+        payload.put("action", action);
         payload.put("planId", planId != null ? planId.toString() : null);
         payload.put("planCode", planCode);
-        payload.put("reason", "Người lập phiếu không được phép tự duyệt phiếu của chính mình");
+        payload.put("reason", reason);
         payload.put("deniedAt", now != null ? now.toString() : null);
 
         String json;

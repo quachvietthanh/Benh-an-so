@@ -10,9 +10,11 @@ public class MedicationProcurementSuggestionCalculator {
             int minStockThreshold,
             long previousPeriodConsumption
     ) {
-        long targetStock = previousPeriodConsumption + (long) Math.max(0, minStockThreshold);
+        long safeConsumption = Math.min(Math.max(0L, previousPeriodConsumption), (long) Integer.MAX_VALUE);
+        long targetStock = safeConsumption + (long) Math.max(0, minStockThreshold);
         long deficit = targetStock - (long) Math.max(0, eligibleStock);
-        return (int) Math.max(0, deficit);
+        long safeDeficit = Math.min(Math.max(0L, deficit), (long) Integer.MAX_VALUE);
+        return (int) safeDeficit;
     }
 
     public boolean shouldIncludeInSuggestion(

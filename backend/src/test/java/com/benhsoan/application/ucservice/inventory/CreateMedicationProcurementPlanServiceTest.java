@@ -55,6 +55,9 @@ class CreateMedicationProcurementPlanServiceTest {
     @Mock
     private AuditLogRepository auditLogRepository;
 
+    @Mock
+    private MedicationProcurementAuthorizer authorizer;
+
     private CreateMedicationProcurementPlanService service;
     private UUID pharmacistId;
     private UUID medicineId;
@@ -73,6 +76,7 @@ class CreateMedicationProcurementPlanServiceTest {
                 codeGenerator,
                 resultMapper,
                 currentUserPort,
+                authorizer,
                 clockPort,
                 auditLogRepository,
                 new ObjectMapper()
@@ -80,7 +84,7 @@ class CreateMedicationProcurementPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Dược sĩ tạo phiếu dự trù và gửi duyệt ngay thành công (TC-02)")
+    @DisplayName("Dược sĩ tạo phiếu dự trù và gửi duyệt ngay thành công - loại bỏ N+1 bằng findAllById (TC-02 / P3-04)")
     void createAndSubmitPlanSuccess() {
         Medicine mockMedicine = Medicine.restore(
                 medicineId,
@@ -102,7 +106,6 @@ class CreateMedicationProcurementPlanServiceTest {
         when(currentUserPort.getCurrentUserId()).thenReturn(pharmacistId);
         when(clockPort.now()).thenReturn(now);
         when(codeGenerator.generate()).thenReturn("DT000001");
-        when(medicineRepository.findById(medicineId)).thenReturn(Optional.of(mockMedicine));
         when(medicineRepository.findAllById(any())).thenReturn(List.of(mockMedicine));
         when(planRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -126,7 +129,27 @@ class CreateMedicationProcurementPlanServiceTest {
         assertEquals(1, result.totalItems());
         assertEquals(80, result.totalProposedQuantity());
         assertNotNull(result.submittedAt());
+        verify(authorizer).requireCreatePermission();
+        verify(medicineRepository).findAllById(any());
+        verify(medicineRepository, org.mockito.Mockito.never()).findById(any());
         verify(auditLogRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("Người dùng không có quyền CREATE bị từ chối với AccessDeniedException từ tầng Service (P2-01)")
+    void unauthorizedUserCannotCreateThrowsAccessDeniedException() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Từ chối quyền"))
+                .when(authorizer).requireCreatePermission();
+
+        CreateProcurementPlanCommand command = new CreateProcurementPlanCommand(
+                LocalDate.now().minusDays(30),
+                LocalDate.now(),
+                "Dự trù",
+                false,
+                List.of()
+        );
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.create(command));
     }
 
     @Test

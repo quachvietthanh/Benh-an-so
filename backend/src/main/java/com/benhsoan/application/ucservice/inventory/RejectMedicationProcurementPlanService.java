@@ -35,12 +35,16 @@ public class RejectMedicationProcurementPlanService implements RejectMedicationP
     private final MedicationProcurementPlanRepository planRepository;
     private final MedicationProcurementResultMapper resultMapper;
     private final CurrentUserPort currentUserPort;
+    private final MedicationProcurementAuthorizer authorizer;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
+    private final MedicationProcurementAuditWriter auditWriter;
     private final ObjectMapper objectMapper;
 
     @Override
     public ProcurementPlanResult reject(RejectProcurementPlanCommand command) {
+        authorizer.requireApprovePermission();
+
         if (command == null || command.planId() == null) {
             throw new ValidationException("Mã định danh phiếu dự trù từ chối không được để trống.");
         }
@@ -56,6 +60,7 @@ public class RejectMedicationProcurementPlanService implements RejectMedicationP
 
         // Quy tắc phân tách nhiệm vụ (Separation of Duties - SoD): Người lập phiếu không được tự từ chối phiếu của chính mình
         if (actorId != null && actorId.equals(plan.getCreatedBy())) {
+            auditWriter.writeRejectSoDDenied(actorId, plan.getId(), plan.getPlanCode(), now);
             throw new SelfProcurementApprovalNotAllowedException();
         }
 

@@ -59,4 +59,11 @@ class MedicationProcurementSuggestionCalculatorTest {
         // Nếu onlyBelowThreshold=false -> luôn bao gồm để Dược sĩ tự chọn
         assertTrue(calculator.shouldIncludeInSuggestion(200, 100, 0, false));
     }
+
+    @Test
+    @DisplayName("Saturated math bảo đảm không bao giờ tràn số nguyên thành số âm khi consumption cực lớn (P3-06)")
+    void calculateWithHugeConsumptionDoesNotOverflowToNegative() {
+        int suggested = calculator.calculateSuggestedQuantity(10, 50, Long.MAX_VALUE);
+        assertEquals(Integer.MAX_VALUE, suggested);
+    }
 }

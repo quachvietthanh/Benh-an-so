@@ -51,6 +51,12 @@ class RejectMedicationProcurementPlanServiceTest {
     @Mock
     private AuditLogRepository auditLogRepository;
 
+    @Mock
+    private MedicationProcurementAuthorizer authorizer;
+
+    @Mock
+    private MedicationProcurementAuditWriter auditWriter;
+
     private RejectMedicationProcurementPlanService service;
     private UUID creatorId;
     private UUID managerId;
@@ -71,8 +77,10 @@ class RejectMedicationProcurementPlanServiceTest {
                 planRepository,
                 resultMapper,
                 currentUserPort,
+                authorizer,
                 clockPort,
                 auditLogRepository,
+                auditWriter,
                 new ObjectMapper()
         );
     }
@@ -103,7 +111,7 @@ class RejectMedicationProcurementPlanServiceTest {
     }
 
     @Test
-    @DisplayName("Ném lỗi SelfProcurementApprovalNotAllowedException khi người lập phiếu tự từ chối phiếu của mình (SoD)")
+    @DisplayName("Ném lỗi SelfProcurementApprovalNotAllowedException và ghi audit log độc lập khi người lập phiếu tự từ chối phiếu của mình (P2-02 / SoD)")
     void selfRejectNotAllowedThrowsException() {
         MedicationProcurementPlan plan = createPendingPlan();
         when(planRepository.findByIdForUpdate(planId)).thenReturn(Optional.of(plan));
@@ -113,6 +121,19 @@ class RejectMedicationProcurementPlanServiceTest {
         RejectProcurementPlanCommand command = new RejectProcurementPlanCommand(planId, "Lý do hợp lệ");
 
         assertThrows(SelfProcurementApprovalNotAllowedException.class, () -> service.reject(command));
+        verify(authorizer).requireApprovePermission();
+        verify(auditWriter).writeRejectSoDDenied(creatorId, planId, "DT000001", now);
+    }
+
+    @Test
+    @DisplayName("Người dùng không có quyền APPROVE bị từ chối với AccessDeniedException từ tầng Service (P2-01)")
+    void unauthorizedUserCannotRejectThrowsAccessDeniedException() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Từ chối quyền"))
+                .when(authorizer).requireApprovePermission();
+
+        RejectProcurementPlanCommand command = new RejectProcurementPlanCommand(planId, "Lý do từ chối hợp lệ");
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.reject(command));
     }
 
     @Test

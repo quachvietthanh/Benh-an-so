@@ -35,10 +35,13 @@ public class GetMedicationProcurementSuggestionService implements GetMedicationP
     private final EligibleStockSnapshotService eligibleStockSnapshotService;
     private final OperationalReportQueryRepository operationalReportQueryRepository;
     private final MedicationProcurementSuggestionCalculator calculator;
+    private final MedicationProcurementAuthorizer authorizer;
     private final ClockPort clockPort;
 
     @Override
     public ProcurementSuggestionResult getSuggestions(LocalDate from, LocalDate to, boolean onlyBelowThreshold) {
+        authorizer.requireReadPermission();
+
         Instant now = clockPort.now();
         LocalDate today = LocalDate.ofInstant(now, CLINIC_ZONE);
 
@@ -78,6 +81,7 @@ public class GetMedicationProcurementSuggestionService implements GetMedicationP
             long consumption = consumptionMap.getOrDefault(medicine.getId(), 0L);
 
             int suggestedQuantity = calculator.calculateSuggestedQuantity(eligibleStock, minThreshold, consumption);
+            int safeConsumption = (int) Math.min(Math.max(0L, consumption), (long) Integer.MAX_VALUE);
 
             if (calculator.shouldIncludeInSuggestion(eligibleStock, minThreshold, suggestedQuantity, onlyBelowThreshold)) {
                 suggestionItems.add(new ProcurementSuggestionItemResult(
@@ -88,7 +92,7 @@ public class GetMedicationProcurementSuggestionService implements GetMedicationP
                         medicine.getStockQuantity(),
                         eligibleStock,
                         minThreshold,
-                        (int) consumption,
+                        safeConsumption,
                         suggestedQuantity
                 ));
             }

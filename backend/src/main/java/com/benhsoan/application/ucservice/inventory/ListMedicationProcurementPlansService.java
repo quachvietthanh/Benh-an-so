@@ -27,9 +27,12 @@ public class ListMedicationProcurementPlansService implements ListMedicationProc
 
     private final MedicationProcurementPlanRepository planRepository;
     private final MedicationProcurementResultMapper resultMapper;
+    private final MedicationProcurementAuthorizer authorizer;
 
     @Override
     public Page<ProcurementPlanSummaryResult> list(ListProcurementPlansQuery query) {
+        authorizer.requireReadPermission();
+
         int page = (query != null && query.page() >= 0) ? query.page() : DEFAULT_PAGE;
         int size = (query != null && query.size() > 0) ? Math.min(query.size(), MAX_SIZE) : DEFAULT_SIZE;
 

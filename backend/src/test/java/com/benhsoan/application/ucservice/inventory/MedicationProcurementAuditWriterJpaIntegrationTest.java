@@ -96,4 +96,38 @@ class MedicationProcurementAuditWriterJpaIntegrationTest {
             assertTrue(log.getDetail().contains(planCode));
         });
     }
+
+    @Test
+    @DisplayName("Bản ghi audit ACCESS_DENIED khi vi phạm SoD tự từ chối vẫn tồn tại sau khi transaction nghiệp vụ bị rollback (P2-02)")
+    void writeRejectSoDDenied_survivesOuterTransactionRollback() {
+        UUID actorId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+        String planCode = "DT000002";
+
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                // Ghi audit log từ chối vi phạm SoD qua REQUIRES_NEW
+                auditWriter.writeRejectSoDDenied(actorId, planId, planCode, NOW);
+                // Giả lập ngoại lệ nghiệp vụ làm rollback
+                throw new IllegalStateException("Mô phỏng lỗi nghiệp vụ làm rollback transaction chính khi reject");
+            });
+        } catch (IllegalStateException ignored) {
+            // Transaction chính đã bị rollback
+        }
+
+        // Kiểm chứng: Bản ghi kiểm toán REJECT_DENIED_SOD vẫn tồn tại!
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            var logs = jpaAuditLogRepository.findAll();
+            assertEquals(1, logs.size(), "Bản ghi audit log REJECT_DENIED_SOD phải được bảo toàn trong DB dù transaction chính đã rollback");
+
+            AuditLogEntity log = logs.get(0);
+            assertEquals(actorId, log.getUserId());
+            assertEquals(ActionType.ACCESS_DENIED, log.getActionType());
+            assertEquals(ResourceType.MEDICATION_PROCUREMENT_PLAN, log.getResourceType());
+            assertEquals(planId, log.getResourceId());
+            assertNotNull(log.getDetail());
+            assertTrue(log.getDetail().contains("REJECT_DENIED_SOD"));
+            assertTrue(log.getDetail().contains(planCode));
+        });
+    }
 }

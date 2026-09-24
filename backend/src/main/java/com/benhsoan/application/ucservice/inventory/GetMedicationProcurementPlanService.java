@@ -20,9 +20,12 @@ public class GetMedicationProcurementPlanService implements GetMedicationProcure
 
     private final MedicationProcurementPlanRepository planRepository;
     private final MedicationProcurementResultMapper resultMapper;
+    private final MedicationProcurementAuthorizer authorizer;
 
     @Override
     public ProcurementPlanResult getById(UUID id) {
+        authorizer.requireReadPermission();
+
         if (id == null) {
             throw new ValidationException("Mã định danh phiếu dự trù không được để trống.");
         }
@@ -33,6 +36,8 @@ public class GetMedicationProcurementPlanService implements GetMedicationProcure
 
     @Override
     public ProcurementPlanResult getByPlanCode(String planCode) {
+        authorizer.requireReadPermission();
+
         if (planCode == null || planCode.isBlank()) {
             throw new ValidationException("Mã phiếu dự trù mua thuốc không được để trống.");
         }

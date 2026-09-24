@@ -35,6 +35,7 @@ public class ApproveMedicationProcurementPlanService implements ApproveMedicatio
     private final MedicationProcurementPlanRepository planRepository;
     private final MedicationProcurementResultMapper resultMapper;
     private final CurrentUserPort currentUserPort;
+    private final MedicationProcurementAuthorizer authorizer;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final MedicationProcurementAuditWriter auditWriter;
@@ -42,6 +43,8 @@ public class ApproveMedicationProcurementPlanService implements ApproveMedicatio
 
     @Override
     public ProcurementPlanResult approve(ApproveProcurementPlanCommand command) {
+        authorizer.requireApprovePermission();
+
         if (command == null || command.planId() == null) {
             throw new ValidationException("Mã định danh phiếu dự trù phê duyệt không được để trống.");
         }

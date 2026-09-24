@@ -55,6 +55,9 @@ class ApproveMedicationProcurementPlanServiceTest {
     @Mock
     private MedicationProcurementAuditWriter auditWriter;
 
+    @Mock
+    private MedicationProcurementAuthorizer authorizer;
+
     private ApproveMedicationProcurementPlanService service;
     private UUID creatorId;
     private UUID managerId;
@@ -75,6 +78,7 @@ class ApproveMedicationProcurementPlanServiceTest {
                 planRepository,
                 resultMapper,
                 currentUserPort,
+                authorizer,
                 clockPort,
                 auditLogRepository,
                 auditWriter,
@@ -182,5 +186,16 @@ class ApproveMedicationProcurementPlanServiceTest {
 
         assertThrows(com.benhsoan.domain.shared.exception.ValidationException.class,
                 () -> service.approve(command));
+    }
+
+    @Test
+    @DisplayName("Người dùng không có quyền APPROVE bị từ chối với AccessDeniedException từ tầng Service (P2-01)")
+    void unauthorizedUserCannotApproveThrowsAccessDeniedException() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Từ chối quyền"))
+                .when(authorizer).requireApprovePermission();
+
+        ApproveProcurementPlanCommand command = new ApproveProcurementPlanCommand(planId, "Duyệt", null);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.approve(command));
     }
 }

@@ -38,9 +38,17 @@ public class MedicationProcurementResultMapper {
         Map<UUID, Medicine> medicineMap = medicineRepository.findAllById(medicineIds).stream()
                 .collect(Collectors.toMap(Medicine::getId, Function.identity()));
 
+        return toPlanResult(plan, medicineMap);
+    }
+
+    public ProcurementPlanResult toPlanResult(MedicationProcurementPlan plan, Map<UUID, Medicine> medicineMap) {
+        if (plan == null) {
+            return null;
+        }
+
         List<ProcurementPlanItemResult> itemResults = new ArrayList<>();
         for (MedicationProcurementItem item : plan.getItems()) {
-            Medicine med = medicineMap.get(item.getMedicineId());
+            Medicine med = medicineMap != null ? medicineMap.get(item.getMedicineId()) : null;
             itemResults.add(new ProcurementPlanItemResult(
                     item.getId(),
                     item.getPlanId(),

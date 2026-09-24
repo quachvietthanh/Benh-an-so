@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import com.benhsoan.domain.inventory.procurement.MedicationProcurementItem;
 import com.benhsoan.domain.inventory.procurement.MedicationProcurementPlan;
 import com.benhsoan.domain.inventory.procurement.exception.ProcurementPlanEmptyItemsException;
 import com.benhsoan.domain.inventory.procurement.exception.ProcurementPlanNotFoundException;
+import com.benhsoan.domain.medicine.Medicine;
 import com.benhsoan.domain.medicine.exception.MedicineNotFoundException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.inventory.CreateProcurementPlanItemCommand;
@@ -42,12 +45,15 @@ public class UpdateMedicationProcurementPlanService implements UpdateMedicationP
     private final MedicineRepository medicineRepository;
     private final MedicationProcurementResultMapper resultMapper;
     private final CurrentUserPort currentUserPort;
+    private final MedicationProcurementAuthorizer authorizer;
     private final ClockPort clockPort;
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
     @Override
     public ProcurementPlanResult update(UpdateProcurementPlanCommand command) {
+        authorizer.requireCreatePermission();
+
         if (command == null || command.planId() == null) {
             throw new ValidationException("Mã định danh phiếu dự trù không được để trống.");
         }
@@ -61,13 +67,23 @@ public class UpdateMedicationProcurementPlanService implements UpdateMedicationP
         MedicationProcurementPlan plan = planRepository.findByIdForUpdate(command.planId())
                 .orElseThrow(() -> new ProcurementPlanNotFoundException(command.planId()));
 
+        List<UUID> medicineIds = command.items().stream()
+                .map(item -> {
+                    if (item.medicineId() == null) {
+                        throw new ValidationException("Mã thuốc trong danh sách không được để trống.");
+                    }
+                    return item.medicineId();
+                })
+                .toList();
+
+        Map<UUID, Medicine> medicineMap = medicineRepository.findAllById(medicineIds).stream()
+                .collect(Collectors.toMap(Medicine::getId, java.util.function.Function.identity()));
+
         List<MedicationProcurementItem> newItems = new ArrayList<>();
         for (CreateProcurementPlanItemCommand itemCmd : command.items()) {
-            if (itemCmd.medicineId() == null) {
-                throw new ValidationException("Mã thuốc trong danh sách không được để trống.");
+            if (!medicineMap.containsKey(itemCmd.medicineId())) {
+                throw new MedicineNotFoundException(itemCmd.medicineId());
             }
-            medicineRepository.findById(itemCmd.medicineId())
-                    .orElseThrow(() -> new MedicineNotFoundException(itemCmd.medicineId()));
 
             newItems.add(MedicationProcurementItem.create(
                     UUID.randomUUID(),
@@ -87,11 +103,13 @@ public class UpdateMedicationProcurementPlanService implements UpdateMedicationP
         MedicationProcurementPlan savedPlan = planRepository.save(plan);
 
         writeAuditLog(actorId, savedPlan, ActionType.UPDATE, "UPDATE", now);
-        return resultMapper.toPlanResult(savedPlan);
+        return resultMapper.toPlanResult(savedPlan, medicineMap);
     }
 
     @Override
     public ProcurementPlanResult submit(UUID id) {
+        authorizer.requireCreatePermission();
+
         if (id == null) {
             throw new ValidationException("Mã định danh phiếu dự trù không được để trống.");
         }
@@ -111,6 +129,8 @@ public class UpdateMedicationProcurementPlanService implements UpdateMedicationP
 
     @Override
     public void cancel(UUID id) {
+        authorizer.requireCreatePermission();
+
         if (id == null) {
             throw new ValidationException("Mã định danh phiếu dự trù không được để trống.");
         }

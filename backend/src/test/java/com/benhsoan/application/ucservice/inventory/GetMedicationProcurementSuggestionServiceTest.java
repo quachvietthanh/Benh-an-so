@@ -2,7 +2,9 @@ package com.benhsoan.application.ucservice.inventory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -40,6 +42,9 @@ class GetMedicationProcurementSuggestionServiceTest {
     @Mock
     private ClockPort clockPort;
 
+    @Mock
+    private MedicationProcurementAuthorizer authorizer;
+
     private GetMedicationProcurementSuggestionService service;
     private Instant now;
     private UUID medicineId1;
@@ -56,6 +61,7 @@ class GetMedicationProcurementSuggestionServiceTest {
                 eligibleStockSnapshotService,
                 operationalReportQueryRepository,
                 new MedicationProcurementSuggestionCalculator(),
+                authorizer,
                 clockPort
         );
     }
@@ -124,5 +130,16 @@ class GetMedicationProcurementSuggestionServiceTest {
         assertEquals(100, result.items().get(0).minStockThreshold());
         assertEquals(80, result.items().get(0).previousPeriodConsumption());
         assertEquals(150, result.items().get(0).suggestedQuantity());
+        verify(authorizer).requireReadPermission();
+    }
+
+    @Test
+    @DisplayName("Người dùng không có quyền READ bị từ chối với AccessDeniedException từ tầng Service (P2-01)")
+    void unauthorizedUserCannotGetSuggestionsThrowsAccessDeniedException() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Từ chối quyền"))
+                .when(authorizer).requireReadPermission();
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.getSuggestions(LocalDate.now().minusDays(30), LocalDate.now(), true));
     }
 }
