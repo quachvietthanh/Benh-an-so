@@ -52,6 +52,8 @@ public record UpdatePatientCommand(
 
         String guardianIdentityNumber,
 
+        java.util.UUID guardianUserId,
+
         String consentSignerName,
 
         Boolean transitionToAdult,

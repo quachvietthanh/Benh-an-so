@@ -44,6 +44,11 @@ public class PatientPortalNotificationCreator {
     private static final String LAB_RESULT_TITLE = "Kết quả cận lâm sàng mới";
     private static final String LAB_RESULT_MESSAGE = "Bạn có kết quả cận lâm sàng mới.";
 
+    // NCL-14-CN-010 TC-03: the link is only proposed for removal, never removed automatically.
+    private static final String GUARDIAN_REVIEW_TITLE = "Rà soát liên kết người giám hộ";
+    private static final String GUARDIAN_REVIEW_MESSAGE =
+            "Hồ sơ %s đã đủ 18 tuổi. Vui lòng rà soát để gỡ bỏ liên kết người giám hộ.";
+
     private final PatientPortalNotificationRepository notificationRepository;
     private final PatientRepository patientRepository;
 
@@ -91,5 +96,48 @@ public class PatientPortalNotificationCreator {
         }
         notificationRepository.save(PatientPortalNotification.labResultAvailable(
                 patientId, LAB_RESULT_TITLE, LAB_RESULT_MESSAGE, clinicalResultId, now));
+    }
+
+    /**
+     * NCL-14-CN-010 TC-03: notifies both affected accounts that a guardian link should be
+     * reviewed because the dependent has reached adulthood.
+     *
+     * <p>Idempotent per (recipient, dependent) pair through
+     * {@code existsByPatientIdAndTypeAndGuardianReviewDependentPatientId}, so repeated sweeps
+     * never duplicate the reminder. The guardian relationship is intentionally left untouched:
+     * the notification only proposes the review, it never unlinks.</p>
+     *
+     * @param dependent the now-adult dependent whose guardian link is under review
+     * @param now       current instant from {@link com.benhsoan.port.outbound.time.ClockPort}
+     */
+    public void createGuardianLinkReview(Patient dependent, Instant now) {
+        if (dependent == null || dependent.getUserId() == null) {
+            return;
+        }
+        String message = GUARDIAN_REVIEW_MESSAGE.formatted(dependent.getFullName());
+        createGuardianLinkReviewFor(dependent.getId(), dependent.getId(), message, now);
+
+        UUID guardianUserId = dependent.getGuardianUserId();
+        if (guardianUserId != null) {
+            patientRepository.findByUserId(guardianUserId)
+                    .ifPresent(guardian -> createGuardianLinkReviewFor(
+                            guardian.getId(), dependent.getId(), message, now));
+        }
+    }
+
+    private void createGuardianLinkReviewFor(
+            UUID recipientPatientId,
+            UUID dependentPatientId,
+            String message,
+            Instant now
+    ) {
+        if (notificationRepository.existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+                recipientPatientId,
+                PatientPortalNotificationType.GUARDIAN_LINK_REVIEW,
+                dependentPatientId)) {
+            return;
+        }
+        notificationRepository.save(PatientPortalNotification.guardianLinkReview(
+                recipientPatientId, GUARDIAN_REVIEW_TITLE, message, dependentPatientId, now));
     }
 }

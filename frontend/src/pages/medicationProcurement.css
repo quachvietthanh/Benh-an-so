@@ -1,0 +1,124 @@
+.procurement-page-container {
+  padding: 20px 24px 48px;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 64px);
+}
+
+.procurement-header-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* Stats Cards Grid */
+.procurement-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.procurement-stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.procurement-stat-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.06);
+  transform: translateY(-1px);
+}
+
+.procurement-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.procurement-stat-icon.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.procurement-stat-icon.orange {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.procurement-stat-icon.green {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.procurement-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.procurement-stat-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.procurement-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+/* Card Wrapper */
+.procurement-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Toolbar Controls */
+.procurement-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Suggestion Table Specific */
+.procurement-suggested-highlight {
+  font-size: 15px;
+  font-weight: 800;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.procurement-below-stock {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.procurement-normal-stock {
+  color: #1e293b;
+  font-weight: 500;
+}

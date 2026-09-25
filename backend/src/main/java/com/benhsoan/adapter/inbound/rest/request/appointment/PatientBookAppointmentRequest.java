@@ -23,7 +23,12 @@ public record PatientBookAppointmentRequest(
         LocalTime startTime,
 
         @Size(max = 500, message = "Lý do khám không được vượt quá 500 ký tự.")
-        String reason
+        String reason,
+
+        // NCL-14-CN-010: optional target patient. null = the authenticated user's own patient
+        // profile; a non-null value selects a linked dependent patient and is always
+        // authorised server-side against patients.guardian_user_id.
+        UUID patientId
 
 ) {
 }
