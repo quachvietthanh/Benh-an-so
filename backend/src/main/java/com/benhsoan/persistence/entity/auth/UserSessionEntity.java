@@ -46,4 +46,10 @@ public class UserSessionEntity {
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
+    @Column(name = "user_agent", length = 500)
+    private String userAgent;
 }

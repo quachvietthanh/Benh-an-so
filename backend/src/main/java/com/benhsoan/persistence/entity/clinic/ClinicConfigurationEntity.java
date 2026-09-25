@@ -47,6 +47,9 @@ public class ClinicConfigurationEntity {
     @Column(name = "signing_deadline_hours", nullable = false)
     private int signingDeadlineHours;
 
+    @Column(name = "session_idle_timeout_minutes", nullable = false)
+    private int sessionIdleTimeoutMinutes;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

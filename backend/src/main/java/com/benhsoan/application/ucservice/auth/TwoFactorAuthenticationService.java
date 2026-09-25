@@ -152,7 +152,7 @@ public class TwoFactorAuthenticationService implements TwoFactorVerificationUseC
         Role role = roleRepository.findById(user.getRoleId())
                 .orElseThrow(IllegalStateException::new);
 
-        return completeLogin(user, role, now, ipAddress);
+        return completeLogin(user, role, now, ipAddress, command.userAgent());
     }
 
     @Override
@@ -200,14 +200,16 @@ public class TwoFactorAuthenticationService implements TwoFactorVerificationUseC
         return codeExpiry.isAfter(maxLifetime) ? maxLifetime : codeExpiry;
     }
 
-    private LoginResult completeLogin(User user, Role role, Instant now, String ipAddress) {
+    private LoginResult completeLogin(User user, Role role, Instant now, String ipAddress, String userAgent) {
         userSessionRepository.revokeByUserId(user.getId(), now);
 
         String refreshToken = refreshTokenGeneratorPort.generate();
         UserSession session = UserSession.create(
                 user.getId(),
                 tokenHashPort.hash(refreshToken),
-                now.plus(REFRESH_TOKEN_TIMEOUT)
+                now.plus(REFRESH_TOKEN_TIMEOUT),
+                ipAddress,
+                userAgent
         );
         userSessionRepository.save(session);
 

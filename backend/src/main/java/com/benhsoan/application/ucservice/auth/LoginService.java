@@ -200,7 +200,9 @@ public class LoginService implements LoginUseCase {
                 UserSession.create(
                         user.getId(),
                         tokenHashPort.hash(refreshToken),
-                        now.plus(REFRESH_TOKEN_TIMEOUT)
+                        now.plus(REFRESH_TOKEN_TIMEOUT),
+                        command.ipAddress(),
+                        command.userAgent()
                 );
 
         userSessionRepository.save(session);

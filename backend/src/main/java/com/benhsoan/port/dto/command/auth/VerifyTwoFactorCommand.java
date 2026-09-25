@@ -10,10 +10,16 @@ public record VerifyTwoFactorCommand(
         @NotBlank
         String code,
 
-        String ipAddress
+        String ipAddress,
+
+        String userAgent
 
 ) {
     public VerifyTwoFactorCommand(String twoFactorToken, String code) {
-        this(twoFactorToken, code, null);
+        this(twoFactorToken, code, null, null);
+    }
+
+    public VerifyTwoFactorCommand(String twoFactorToken, String code, String ipAddress) {
+        this(twoFactorToken, code, ipAddress, null);
     }
 }
