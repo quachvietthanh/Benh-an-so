@@ -108,6 +108,16 @@ import {
   getUnhandledAllergies,
   isAllergyHandled,
 } from '../utils/prescriptionAllergyValidation.js'
+import {
+  PRESET_MAX_DOSE_OVERRIDE_REASONS,
+  validateOverrideReason,
+  formatDoseWarningMessage,
+  formatDoseNumber,
+  hasUnresolvedWarnings,
+  buildOverridesPayload,
+  parseSingleDoseQuantity,
+  calculateAutoQuantity,
+} from '../utils/maxDailyDoseHelpers.js'
 import { mergeMedicines, saveStoredPrescription, saveStoredAllergyWarningLogs } from '../utils/storageHelpers'
 import {
   getAvailableStock,
@@ -162,6 +172,7 @@ const createEmptyItem = (isOriginal = false) => ({
   durationDays: 5,
   instructions: '',
   isOriginal,
+  quantityManuallyEdited: false,
 })
 
 function PrescriptionPage() {
@@ -219,6 +230,13 @@ function PrescriptionPage() {
   const [contraindicationApiError, setContraindicationApiError] = useState(null)
   const [quickPregnancyModalOpen, setQuickPregnancyModalOpen] = useState(false)
   const contraindicationRequestIdRef = useRef(0)
+
+  const [maxDailyDoseWarnings, setMaxDailyDoseWarnings] = useState([])
+  const [maxDailyDoseMissingData, setMaxDailyDoseMissingData] = useState([])
+  const [checkingMaxDailyDose, setCheckingMaxDailyDose] = useState(false)
+  const [maxDailyDoseReasonMap, setMaxDailyDoseReasonMap] = useState({})
+  const doseCheckDebounceTimerRef = useRef(null)
+  const doseCheckRequestIdRef = useRef(0)
 
   const [specialControlModalOpen, setSpecialControlModalOpen] = useState(false)
   const [pendingSpecialControlData, setPendingSpecialControlData] = useState(null)
@@ -412,6 +430,13 @@ function PrescriptionPage() {
         }
       }
 
+      if (hasUnresolvedWarnings(maxDailyDoseWarnings, maxDailyDoseReasonMap)) {
+        return {
+          allowed: false,
+          reason: 'Vui lòng nhập lý do cho các hoạt chất vượt liều trước khi lưu',
+        }
+      }
+
       return { allowed: true, reason: '' }
     },
     [
@@ -430,6 +455,8 @@ function PrescriptionPage() {
       detectedContraindicationMissingData,
       detectedContraindicationWarnings,
       confirmedContraindicationOverrides,
+      maxDailyDoseWarnings,
+      maxDailyDoseReasonMap,
     ],
   )
   const canSubmit = submitStatus.allowed
@@ -829,6 +856,75 @@ function PrescriptionPage() {
     }
   }, [medicalRecordId])
 
+  const performMaxDailyDoseCheck = useCallback(async (currentItems) => {
+    const rawItems = (currentItems || []).filter((item) => Boolean(item.medicineId))
+    if (!medicalRecordId || rawItems.length === 0) {
+      setMaxDailyDoseWarnings([])
+      setMaxDailyDoseMissingData([])
+      return { warnings: [], missingData: [] }
+    }
+
+    const payloadItems = rawItems
+      .map((item) => {
+        const qty = item.singleDoseQuantity !== undefined && item.singleDoseQuantity !== '' && !isNaN(Number(item.singleDoseQuantity))
+          ? Number(item.singleDoseQuantity)
+          : parseSingleDoseQuantity(item.dosage, 1)
+        const freq = Number(item.frequency) || 1
+        return {
+          medicineId: item.medicineId,
+          singleDoseQuantity: qty > 0 ? qty : 1,
+          frequency: freq > 0 ? freq : 1,
+        }
+      })
+      .filter((it) => it.singleDoseQuantity > 0 && it.frequency > 0)
+
+    if (payloadItems.length === 0) {
+      setMaxDailyDoseWarnings([])
+      setMaxDailyDoseMissingData([])
+      return { warnings: [], missingData: [] }
+    }
+
+    const currentReqId = ++doseCheckRequestIdRef.current
+    setCheckingMaxDailyDose(true)
+    try {
+      const response = await pharmacyApi.checkMaxDailyDose(medicalRecordId, payloadItems)
+      if (currentReqId !== doseCheckRequestIdRef.current) {
+        return { warnings: [], missingData: [] }
+      }
+      const data = response?.data || {}
+      const warnings = data.warnings || []
+      const missingData = data.missingData || []
+      setMaxDailyDoseWarnings(warnings)
+      setMaxDailyDoseMissingData(missingData)
+      return { warnings, missingData }
+    } catch (error) {
+      if (currentReqId !== doseCheckRequestIdRef.current) {
+        return { warnings: [], missingData: [] }
+      }
+      console.warn('Lỗi kiểm tra liều tối đa theo ngày từ máy chủ:', error)
+      return { warnings: [], missingData: [] }
+    } finally {
+      if (currentReqId === doseCheckRequestIdRef.current) {
+        setCheckingMaxDailyDose(false)
+      }
+    }
+  }, [medicalRecordId])
+
+  useEffect(() => {
+    if (doseCheckDebounceTimerRef.current) {
+      clearTimeout(doseCheckDebounceTimerRef.current)
+    }
+    doseCheckDebounceTimerRef.current = setTimeout(() => {
+      performMaxDailyDoseCheck(items).catch(() => {})
+    }, 500)
+
+    return () => {
+      if (doseCheckDebounceTimerRef.current) {
+        clearTimeout(doseCheckDebounceTimerRef.current)
+      }
+    }
+  }, [items, medicalRecordId, performMaxDailyDoseCheck])
+
   const handleConfirmSpecialControlPrescribe = (reason) => {
     if (!pendingSpecialControlData) return
     const { clientId, medicine, medicineId, isEditingExisting } = pendingSpecialControlData
@@ -853,7 +949,9 @@ function PrescriptionPage() {
     const initialRoute = targetItem?.route || 'ORAL'
     const freq = Number(targetItem?.frequency) || 2
     const days = Number(targetItem?.durationDays) || 5
-    const initialQty = targetItem?.quantity > 1 ? targetItem.quantity : freq * days
+    const initialQty = targetItem?.quantityManuallyEdited && targetItem?.quantity > 0
+      ? targetItem.quantity
+      : (calculateAutoQuantity({ ...targetItem, dosage: initialDosage, frequency: freq, durationDays: days }) || 10)
 
     const nextItems = items.map((item) => {
       if (item.clientId !== clientId) return item
@@ -925,7 +1023,9 @@ function PrescriptionPage() {
         const initialRoute = item.route || 'ORAL'
         const freq = Number(item.frequency) || 2
         const days = Number(item.durationDays) || 5
-        const initialQty = item.quantity > 1 ? item.quantity : freq * days
+        const initialQty = item.quantityManuallyEdited && item.quantity > 0
+          ? item.quantity
+          : (calculateAutoQuantity({ ...item, dosage: initialDosage, frequency: freq, durationDays: days }) || 10)
 
         return {
           ...item,
@@ -935,6 +1035,25 @@ function PrescriptionPage() {
           quantity: initialQty,
           specialControlConfirmed: false,
           specialControlReason: undefined,
+        }
+      }
+
+      if (field === 'quantity') {
+        return {
+          ...item,
+          quantity: value,
+          quantityManuallyEdited: true,
+        }
+      }
+
+      if (field === 'dosage' || field === 'frequency' || field === 'durationDays') {
+        const updatedItem = { ...item, [field]: value }
+        const autoQty = calculateAutoQuantity(updatedItem)
+        return {
+          ...updatedItem,
+          quantity: item.quantityManuallyEdited && item.quantity > 0
+            ? item.quantity
+            : (autoQty > 0 ? autoQty : item.quantity),
         }
       }
 
@@ -1051,9 +1170,17 @@ function PrescriptionPage() {
     items.map((item) => {
       const chosenMed = selectedMedicineMap.get(String(item.medicineId))
       const isSpec = Boolean(chosenMed?.isSpecialControl || item.specialControlConfirmed)
+      const singleDose =
+        item.singleDoseQuantity !== undefined &&
+        item.singleDoseQuantity !== '' &&
+        !isNaN(Number(item.singleDoseQuantity))
+          ? Number(item.singleDoseQuantity)
+          : parseSingleDoseQuantity(item.dosage, 1)
+
       return {
         medicineId: item.medicineId,
         dosage: item.dosage.trim(),
+        singleDoseQuantity: singleDose > 0 ? singleDose : 1,
         frequency: Number(item.frequency),
         route: item.route,
         durationDays: Number(item.durationDays),
@@ -1159,6 +1286,12 @@ function PrescriptionPage() {
       // Chuẩn bị danh sách overrides chống chỉ định hợp lệ
       const validContraOverrides = sanitizeContraindicationOverrides(contraOverrides)
 
+      // Chuẩn bị danh sách overrides vượt liều tối đa theo ngày hợp lệ
+      const maxDailyDoseOverridesPayload = buildOverridesPayload(
+        maxDailyDoseWarnings,
+        maxDailyDoseReasonMap,
+      )
+
       const payload = {
         note: note.trim(),
         items: formatItems(),
@@ -1178,6 +1311,11 @@ function PrescriptionPage() {
         ...(!editingPrescription && validContraOverrides.length > 0
           ? {
               contraindicationOverrides: validContraOverrides,
+            }
+          : {}),
+        ...(maxDailyDoseOverridesPayload.length > 0
+          ? {
+              maxDailyDoseOverrides: maxDailyDoseOverridesPayload,
             }
           : {}),
       }
@@ -1304,10 +1442,27 @@ function PrescriptionPage() {
       setDetectedContraindicationWarnings([])
       setDetectedContraindicationMissingData([])
       setConfirmedContraindicationOverrides([])
+      setMaxDailyDoseWarnings([])
+      setMaxDailyDoseMissingData([])
+      setMaxDailyDoseReasonMap({})
       await loadData()
       setActiveTab('history')
     } catch (error) {
       const responseData = error?.response?.data
+      if (
+        responseData?.code === 'MAX_DAILY_DOSE_CONFIRMATION_REQUIRED' ||
+        responseData?.errorCode === 'MAX_DAILY_DOSE_CONFIRMATION_REQUIRED' ||
+        (error?.response?.status === 409 && responseData?.details?.warnings)
+      ) {
+        const rawWarnings = responseData?.details?.warnings || []
+        if (rawWarnings.length > 0) {
+          setMaxDailyDoseWarnings(rawWarnings)
+        }
+        message.error(
+          'Tổng liều hoạt chất trong ngày vượt ngưỡng tối đa; vui lòng kiểm tra và xác nhận lý do lâm sàng để tiếp tục.',
+        )
+        return
+      }
       if (responseData?.code === 'ALLERGY_CONFIRMATION_REQUIRED') {
         const rawWarnings = responseData?.details?.warnings || []
         if (rawWarnings.length > 0) {
@@ -1395,6 +1550,14 @@ function PrescriptionPage() {
         !areAllContraindicationsHandled(contraWarnings, confirmedContraindicationOverrides)
       ) {
         setContraindicationModalOpen(true)
+        return
+      }
+
+      // 4. Kiểm tra liều dùng tối đa theo ngày
+      const doseCheckRes = await performMaxDailyDoseCheck(items)
+      const currentDoseWarnings = doseCheckRes?.warnings || maxDailyDoseWarnings
+      if (hasUnresolvedWarnings(currentDoseWarnings, maxDailyDoseReasonMap)) {
+        message.error('Vui lòng nhập lý do cho các hoạt chất vượt liều trước khi lưu.')
         return
       }
 
@@ -1548,6 +1711,9 @@ function PrescriptionPage() {
     setDetectedContraindicationWarnings([])
     setDetectedContraindicationMissingData([])
     setConfirmedContraindicationOverrides([])
+    setMaxDailyDoseWarnings([])
+    setMaxDailyDoseMissingData([])
+    setMaxDailyDoseReasonMap({})
   }
 
   const handleOpenCancelModal = (prescription) => {
@@ -2230,7 +2396,7 @@ function PrescriptionPage() {
             <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
               <Button
                 type="primary"
-                loading={saving || checkingInteractions || checkingAllergies}
+                loading={saving || checkingInteractions || checkingAllergies || checkingContraindications || checkingMaxDailyDose}
                 disabled={!canSubmit}
                 icon={<CheckCircleOutlined />}
                 onClick={handleSaveClick}
@@ -2657,6 +2823,139 @@ function PrescriptionPage() {
                     />
                   )}
 
+                  {maxDailyDoseWarnings.length > 0 && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      icon={<WarningOutlined style={{ fontSize: 22, color: '#d97706' }} />}
+                      message={
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <Text strong style={{ fontSize: 15, color: '#b45309' }}>
+                            ⚠️ Phát hiện {maxDailyDoseWarnings.length} hoạt chất vượt liều tối đa theo ngày. Vui lòng xem chi tiết và xác nhận lý do bên dưới trước khi lưu đơn.
+                          </Text>
+                          {hasUnresolvedWarnings(maxDailyDoseWarnings, maxDailyDoseReasonMap) ? (
+                            <Tag color="orange" icon={<ExclamationCircleOutlined />}>
+                              Cần nhập đủ lý do giải trình
+                            </Tag>
+                          ) : (
+                            <Tag color="green" icon={<CheckCircleOutlined />}>
+                              Đã nhập đầy đủ lý do giải trình
+                            </Tag>
+                          )}
+                        </div>
+                      }
+                      description={
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ marginBottom: 6 }}>
+                            {maxDailyDoseWarnings.map((warning, wIdx) => {
+                              const ingredient = warning.activeIngredient
+                              const reason = maxDailyDoseReasonMap[ingredient] || ''
+                              const reasonValidation = validateOverrideReason(reason)
+                              const isMissingReason = !reasonValidation.valid
+
+                              return (
+                                <div
+                                  key={wIdx}
+                                  style={{
+                                    background: '#ffffff',
+                                    border: isMissingReason ? '1.5px solid #f59e0b' : '1.5px solid #10b981',
+                                    borderRadius: 8,
+                                    padding: 12,
+                                    marginBottom: 10,
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                                    <Text strong style={{ color: '#b45309', fontSize: 13 }}>
+                                      ⚠️ {formatDoseWarningMessage(warning)}
+                                    </Text>
+                                    {isMissingReason ? (
+                                      <Tag color="error" style={{ margin: 0, borderRadius: 4 }}>
+                                        Chưa có lý do hợp lệ
+                                      </Tag>
+                                    ) : (
+                                      <Tag color="success" style={{ margin: 0, borderRadius: 4 }}>
+                                        Đã xác nhận lý do
+                                      </Tag>
+                                    )}
+                                  </div>
+
+                                  <div style={{ marginTop: 6 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                                        Lý do kê vượt liều cho hoạt chất "{ingredient}" <span style={{ color: '#ef4444' }}>*</span>:
+                                      </span>
+                                      <span style={{ fontSize: 11, color: reason.length > 500 ? '#ef4444' : '#6b7280' }}>
+                                        {reason.length}/500 ký tự
+                                      </span>
+                                    </div>
+
+                                    <Input.TextArea
+                                      rows={2}
+                                      maxLength={500}
+                                      disabled={!canPrescribe || saving}
+                                      value={reason}
+                                      onChange={(e) => {
+                                        const val = e.target.value
+                                        setMaxDailyDoseReasonMap((prev) => ({
+                                          ...prev,
+                                          [ingredient]: val,
+                                        }))
+                                      }}
+                                      placeholder={`Nhập lý do lâm sàng giải trình việc kê vượt liều tối đa cho ${ingredient} (bắt buộc, tối đa 500 ký tự)...`}
+                                      style={{
+                                        borderColor: isMissingReason && reason.length > 0 ? '#ef4444' : undefined,
+                                        borderRadius: 6,
+                                      }}
+                                    />
+
+                                    {reason.length > 500 && (
+                                      <div style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>
+                                        Lý do không được vượt quá 500 ký tự.
+                                      </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+                                      <span style={{ fontSize: 11, color: '#64748b' }}>Gợi ý nhanh:</span>
+                                      {PRESET_MAX_DOSE_OVERRIDE_REASONS.map((preset, pIdx) => (
+                                        <Tag
+                                          key={pIdx}
+                                          color="gold"
+                                          style={{
+                                            cursor: canPrescribe && !saving ? 'pointer' : 'not-allowed',
+                                            fontSize: 11,
+                                            margin: 0,
+                                            borderRadius: 4,
+                                            padding: '1px 8px',
+                                          }}
+                                          onClick={() => {
+                                            if (!canPrescribe || saving) return
+                                            setMaxDailyDoseReasonMap((prev) => ({
+                                              ...prev,
+                                              [ingredient]: preset,
+                                            }))
+                                          }}
+                                        >
+                                          + {preset}
+                                        </Tag>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      }
+                      style={{
+                        marginBottom: 16,
+                        border: '2px solid #f59e0b',
+                        backgroundColor: '#fffbeb',
+                        borderRadius: 8,
+                      }}
+                    />
+                  )}
+
                   {items.map((item, index) => {
                     const selectedMed = selectedMedicineMap.get(String(item.medicineId))
                     const unit = selectedMed?.unit || 'viên'
@@ -2672,6 +2971,27 @@ function PrescriptionPage() {
                       Number(item.quantity) > 0,
                     )
 
+                    const medIngredient = (selectedMed?.activeIngredient || selectedMed?.medicineName || '').trim().toLowerCase()
+                    const matchingDoseWarning = maxDailyDoseWarnings.find((w) => {
+                      if (!w.activeIngredient) return false
+                      const warnIng = w.activeIngredient.trim().toLowerCase()
+                      return medIngredient.includes(warnIng) || warnIng.includes(medIngredient)
+                    })
+                    const matchingMissingData = maxDailyDoseMissingData.find((m) => {
+                      const missIng = (m.activeIngredient || '').trim().toLowerCase()
+                      return missIng && (medIngredient.includes(missIng) || missIng.includes(medIngredient))
+                    })
+
+                    let cardBg = item.isOriginal ? '#ffffff' : '#fafafa'
+                    let cardBorder = isComplete ? '1px solid #BFDBFE' : '1px solid #E2E8F0'
+                    let cardBorderLeft = isComplete ? '4px solid #2563EB' : '4px solid #F59E0B'
+
+                    if (matchingDoseWarning) {
+                      cardBg = '#fffbeb'
+                      cardBorder = '1.5px solid #f59e0b'
+                      cardBorderLeft = '4px solid #d97706'
+                    }
+
                     return (
                       <Card
                         key={item.clientId}
@@ -2679,10 +2999,10 @@ function PrescriptionPage() {
                         style={{
                           marginBottom: 16,
                           borderRadius: 8,
-                          border: isComplete ? '1px solid #BFDBFE' : '1px solid #E2E8F0',
-                          borderLeft: isComplete ? '4px solid #2563EB' : '4px solid #F59E0B',
+                          border: cardBorder,
+                          borderLeft: cardBorderLeft,
                           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                          backgroundColor: item.isOriginal ? '#ffffff' : '#fafafa',
+                          backgroundColor: cardBg,
                         }}
                       >
                         {/* Header của thẻ thuốc */}
@@ -2725,6 +3045,24 @@ function PrescriptionPage() {
                             {editingPrescription && (
                               <Tag color={item.isOriginal ? 'default' : 'cyan'} style={{ borderRadius: 12, margin: 0 }}>
                                 {item.isOriginal ? 'Thuốc trong đơn gốc' : 'Thuốc thêm mới'}
+                              </Tag>
+                            )}
+
+                            {matchingDoseWarning && (
+                              <Tag
+                                color="warning"
+                                icon={<WarningOutlined />}
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: 12,
+                                  borderRadius: 12,
+                                  margin: 0,
+                                  backgroundColor: '#fff7ed',
+                                  color: '#c2410c',
+                                  borderColor: '#fdba74',
+                                }}
+                              >
+                                ⚠️ Vượt liều tối đa ngày: {matchingDoseWarning.activeIngredient} ({formatDoseNumber(matchingDoseWarning.totalDailyDoseMg)}/{formatDoseNumber(matchingDoseWarning.maxDailyDoseMg)}mg)
                               </Tag>
                             )}
 
@@ -2855,7 +3193,16 @@ function PrescriptionPage() {
                         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
                           <Col xs={24} md={16}>
                             <Form.Item
-                              label={<span style={{ fontWeight: 600, color: '#334155' }}>Thuốc & Hoạt chất <span style={{ color: '#ef4444' }}>*</span></span>}
+                              label={
+                                <span style={{ fontWeight: 600, color: '#334155' }}>
+                                  Thuốc & Hoạt chất <span style={{ color: '#ef4444' }}>*</span>
+                                  {matchingDoseWarning && (
+                                    <span style={{ color: '#d97706', fontSize: 12, marginLeft: 6, fontWeight: 700 }}>
+                                      ⚠️ Vượt liều tối đa ngày
+                                    </span>
+                                  )}
+                                </span>
+                              }
                               style={{ marginBottom: 0 }}
                             >
                               <Select
@@ -2936,6 +3283,48 @@ function PrescriptionPage() {
                                 </Tag>
                               )
                             })()}
+                          </div>
+                        )}
+
+                        {matchingMissingData && !matchingDoseWarning && (
+                          <div style={{ color: '#64748b', fontSize: 12, marginTop: -4, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span>ℹ️ Thuốc chưa có dữ liệu liều tối đa trong danh mục — không thể kiểm tra tự động.</span>
+                          </div>
+                        )}
+
+                        {matchingDoseWarning && (
+                          <div
+                            style={{
+                              background: '#fff7ed',
+                              border: '1px solid #fed7aa',
+                              padding: '8px 12px',
+                              borderRadius: 6,
+                              marginBottom: 12,
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#9a3412' }}>
+                                Lý do kê vượt liều ({matchingDoseWarning.activeIngredient}) <span style={{ color: '#ef4444' }}>*</span>:
+                              </span>
+                              <span style={{ fontSize: 11, color: (maxDailyDoseReasonMap[matchingDoseWarning.activeIngredient] || '').length > 500 ? '#ef4444' : '#78350f' }}>
+                                {(maxDailyDoseReasonMap[matchingDoseWarning.activeIngredient] || '').length}/500 ký tự
+                              </span>
+                            </div>
+                            <Input.TextArea
+                              rows={2}
+                              maxLength={500}
+                              disabled={!canPrescribe || saving}
+                              value={maxDailyDoseReasonMap[matchingDoseWarning.activeIngredient] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setMaxDailyDoseReasonMap((prev) => ({
+                                  ...prev,
+                                  [matchingDoseWarning.activeIngredient]: val,
+                                }))
+                              }}
+                              placeholder={`Nhập lý do lâm sàng cho hoạt chất ${matchingDoseWarning.activeIngredient}...`}
+                              style={{ borderRadius: 4 }}
+                            />
                           </div>
                         )}
 
@@ -3154,14 +3543,20 @@ function PrescriptionPage() {
                                     borderRadius: 4,
                                   }}
                                   onClick={() => {
-                                    const qty = Number(item.frequency) * Number(item.durationDays)
-                                    handleItemChange(item.clientId, 'quantity', qty)
+                                    const qty = calculateAutoQuantity(item)
+                                    setItems((prev) =>
+                                      prev.map((it) =>
+                                        it.clientId === item.clientId
+                                          ? { ...it, quantity: qty, quantityManuallyEdited: false }
+                                          : it
+                                      )
+                                    )
                                   }}
                                 >
-                                  ⚡ Tự tính: {Number(item.frequency) * Number(item.durationDays)} {unit}
+                                  ⚡ Tự tính: {calculateAutoQuantity(item)} {unit}
                                 </Tag>
                               ) : (
-                                <span style={{ fontSize: 11, color: '#94A3B8' }}>(= Lần × Ngày)</span>
+                                <span style={{ fontSize: 11, color: '#94A3B8' }}>(= Liều × Lần × Ngày)</span>
                               )}
                             </div>
                             {selectedMed && (() => {
@@ -3554,15 +3949,26 @@ function PrescriptionPage() {
                       />
                     )}
 
+                  {checkingMaxDailyDose && (
+                    <div style={{ marginTop: 16 }}>
+                      <Alert
+                        type="info"
+                        showIcon
+                        icon={<Spin size="small" />}
+                        message="Đang kiểm tra liều dùng tối đa theo ngày từ máy chủ..."
+                      />
+                    </div>
+                  )}
+
                   <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     {editingPrescription && (
-                      <Button disabled={checkingInteractions || checkingAllergies || checkingContraindications || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
+                      <Button disabled={checkingInteractions || checkingAllergies || checkingContraindications || checkingMaxDailyDose || saving} onClick={cancelEditMode}>Hủy điều chỉnh</Button>
                     )}
                     {canPrescribe && (
                       <Tooltip title={!canSubmit ? submitStatus.reason : ''}>
                         <Button
                           type="primary"
-                          loading={saving || checkingInteractions || checkingAllergies || checkingContraindications}
+                          loading={saving || checkingInteractions || checkingAllergies || checkingContraindications || checkingMaxDailyDose}
                           disabled={!canSubmit}
                           icon={<CheckCircleOutlined />}
                           onClick={handleSaveClick}
