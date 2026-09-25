@@ -80,6 +80,7 @@ public class PatientRestMapper {
                 .guardianRelationship(request.guardianRelationship())
                 .guardianPhone(request.guardianPhone())
                 .guardianIdentityNumber(request.guardianIdentityNumber())
+                .guardianUserId(request.guardianUserId())
                 .consentSignerName(request.consentSignerName())
                 .transitionToAdult(request.transitionToAdult())
                 .build();

@@ -14,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.domain.appointment.Appointment;
 import com.benhsoan.domain.appointment.DoctorSchedule;
 import com.benhsoan.domain.appointment.exception.DoctorInactiveException;
@@ -89,6 +90,8 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
 
     private final CurrentUserPort currentUserPort;
 
+    private final PatientAccessGuard patientAccessGuard;
+
     private final AuditLogRepository auditLogRepository;
 
     private final ClockPort clockPort;
@@ -109,12 +112,13 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
             CurrentUserPort currentUserPort,
             AuditLogRepository auditLogRepository,
             ClockPort clockPort,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            PatientAccessGuard patientAccessGuard
     ) {
         this(appointmentRepository, appointmentCodeGenerator, doctorScheduleRepository,
                 doctorWeeklyScheduleRepository, doctorTimeOffRepository, patientRepository,
                 userRepository, roleRepository, currentUserPort, auditLogRepository, clockPort,
-                objectMapper, null);
+                objectMapper, null, patientAccessGuard);
     }
 
     @Autowired
@@ -131,7 +135,8 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
             AuditLogRepository auditLogRepository,
             ClockPort clockPort,
             ObjectMapper objectMapper,
-            @Autowired(required = false) AppointmentWaitlistRepository appointmentWaitlistRepository
+            @Autowired(required = false) AppointmentWaitlistRepository appointmentWaitlistRepository,
+            PatientAccessGuard patientAccessGuard
     ) {
         this.appointmentRepository = appointmentRepository;
         this.appointmentCodeGenerator = appointmentCodeGenerator;
@@ -146,6 +151,7 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         this.clockPort = clockPort;
         this.objectMapper = objectMapper;
         this.appointmentWaitlistRepository = appointmentWaitlistRepository;
+        this.patientAccessGuard = patientAccessGuard;
     }
 
 
@@ -170,10 +176,23 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
         }
 
         UUID userId = currentUserPort.getCurrentUserId();
-        Patient patient = patientRepository.findByUserId(userId)
-                .orElseThrow(() -> new AccessDeniedException(
-                        "No patient profile is linked to the authenticated user."));
-        UUID patientId = patient.getId();
+
+        // NCL-14-CN-010: patientId == null keeps the own-profile behaviour; a non-null value
+        // selects a target patient that is authorised server-side by PatientAccessGuard.
+        Patient targetPatient = command.patientId() == null
+                ? patientRepository.findByUserId(userId)
+                        .orElseThrow(() -> new AccessDeniedException(
+                                "No patient profile is linked to the authenticated user."))
+                : patientAccessGuard.requirePatientAccess(command.patientId());
+
+        // QTN-33: re-validate the target profile server-side regardless of how it was resolved,
+        // so a client cannot bypass the linked-profile list and book for an inactive or merged
+        // patient by submitting that patientId directly. Historical records are untouched; this
+        // guard only gates the creation of NEW appointments.
+        targetPatient.validateCanReceiveNewActivity();
+
+        UUID patientId = targetPatient.getId();
+        boolean bookingOnBehalfOfDependent = !userId.equals(targetPatient.getUserId());
 
         // QTN-04: lock the doctor's user row so portal and reception serialize appointment
         // creation per doctor before the overlap check and insert.
@@ -277,7 +296,7 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
                 ActionType.CREATE,
                 ResourceType.APPOINTMENT,
                 saved.getId(),
-                auditDetail(saved, now),
+                auditDetail(saved, userId, bookingOnBehalfOfDependent, now),
                 null,
                 now
         ));
@@ -303,13 +322,21 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
                 && startTime.getNano() == 0;
     }
 
-    private String auditDetail(Appointment appointment, Instant bookedAt) {
+    private String auditDetail(
+            Appointment appointment,
+            UUID actorUserId,
+            boolean bookingOnBehalfOfDependent,
+            Instant bookedAt
+    ) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("patientId", appointment.getPatientId().toString());
         detail.put("doctorId", appointment.getDoctorId().toString());
         detail.put("appointmentTime", appointment.getStartTime().toString());
         detail.put("channel", ONLINE_PORTAL);
         detail.put("bookedAt", bookedAt.toString());
+        // NCL-14-CN-010: distinguish the authenticated actor from the target patient.
+        detail.put("bookedByUserId", actorUserId.toString());
+        detail.put("bookingOnBehalfOfDependent", bookingOnBehalfOfDependent);
 
         try {
             return objectMapper.writeValueAsString(detail);

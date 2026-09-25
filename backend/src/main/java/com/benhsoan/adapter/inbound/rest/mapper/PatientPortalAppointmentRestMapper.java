@@ -19,7 +19,8 @@ public class PatientPortalAppointmentRestMapper {
                 request.doctorId(),
                 request.appointmentDate(),
                 request.startTime(),
-                request.reason()
+                request.reason(),
+                request.patientId()
         );
     }
 

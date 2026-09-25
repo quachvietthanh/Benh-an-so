@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -185,5 +186,79 @@ class PatientPortalNotificationCreatorTest {
         Patient patient = mock(Patient.class);
         when(patient.getUserId()).thenReturn(userId);
         return patient;
+    }
+
+    // --- NCL-14-CN-010 TC-03: guardian-link review notifications -------------
+
+    @Test
+    @DisplayName("TC-03: thong bao cho ca nguoi phu thuoc va nguoi giam ho")
+    void createsGuardianLinkReviewForDependentAndGuardian() {
+        UUID dependentPatientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        UUID guardianPatientId = UUID.randomUUID();
+
+        Patient dependent = mock(Patient.class);
+        when(dependent.getUserId()).thenReturn(PORTAL_USER_ID);
+        when(dependent.getId()).thenReturn(dependentPatientId);
+        when(dependent.getGuardianUserId()).thenReturn(guardianUserId);
+        when(dependent.getFullName()).thenReturn("Nguyen Van Con");
+
+        Patient guardian = mock(Patient.class);
+        when(guardian.getId()).thenReturn(guardianPatientId);
+
+        when(patientRepository.findByUserId(guardianUserId)).thenReturn(Optional.of(guardian));
+        when(notificationRepository.existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+                any(), any(), any())).thenReturn(false);
+
+        creator.createGuardianLinkReview(dependent, NOW);
+
+        ArgumentCaptor<PatientPortalNotification> captor =
+                ArgumentCaptor.forClass(PatientPortalNotification.class);
+        verify(notificationRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+
+        var saved = captor.getAllValues();
+        assertEquals(PatientPortalNotificationType.GUARDIAN_LINK_REVIEW, saved.get(0).getType());
+        assertEquals(dependentPatientId, saved.get(0).getPatientId());
+        assertEquals(dependentPatientId, saved.get(0).getGuardianReviewDependentPatientId());
+        assertEquals(guardianPatientId, saved.get(1).getPatientId());
+        assertEquals(dependentPatientId, saved.get(1).getGuardianReviewDependentPatientId());
+    }
+
+    @Test
+    @DisplayName("TC-03: khong tao thong bao trung lap khi chay lai (idempotent)")
+    void doesNotDuplicateGuardianLinkReviewNotification() {
+        UUID dependentPatientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        UUID guardianPatientId = UUID.randomUUID();
+
+        Patient dependent = mock(Patient.class);
+        when(dependent.getUserId()).thenReturn(PORTAL_USER_ID);
+        when(dependent.getId()).thenReturn(dependentPatientId);
+        when(dependent.getGuardianUserId()).thenReturn(guardianUserId);
+        when(dependent.getFullName()).thenReturn("Nguyen Van Con");
+
+        Patient guardian = mock(Patient.class);
+        when(guardian.getId()).thenReturn(guardianPatientId);
+        when(patientRepository.findByUserId(guardianUserId)).thenReturn(Optional.of(guardian));
+
+        // The recipient already received the review reminder for this dependent.
+        when(notificationRepository.existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+                any(), any(), any())).thenReturn(true);
+
+        creator.createGuardianLinkReview(dependent, NOW);
+        creator.createGuardianLinkReview(dependent, NOW);
+
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TC-03: bo qua ho so phu thuoc khong co tai khoan cong")
+    void skipsGuardianLinkReviewWithoutPortalAccount() {
+        Patient dependent = mock(Patient.class);
+        when(dependent.getUserId()).thenReturn(null);
+
+        creator.createGuardianLinkReview(dependent, NOW);
+
+        verify(notificationRepository, never()).save(any());
     }
 }

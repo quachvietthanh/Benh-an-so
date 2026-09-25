@@ -83,6 +83,6 @@ class MarkPatientPortalNotificationReadServiceTest {
     private PatientPortalNotification notification() {
         return PatientPortalNotification.restore(
                 NOTIFICATION_ID, PATIENT_ID, PatientPortalNotificationType.APPOINTMENT_REMINDER,
-                "t", "m", null, NOW, UUID.randomUUID(), null, null);
+                "t", "m", null, NOW, UUID.randomUUID(), null, null, null);
     }
 }
