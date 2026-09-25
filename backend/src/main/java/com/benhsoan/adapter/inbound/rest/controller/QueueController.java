@@ -43,6 +43,9 @@ import com.benhsoan.port.inbound.queue.PrioritizeQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
 import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueDisplayUseCase;
+import com.benhsoan.port.dto.command.queue.GetQueueDisplayQuery;
+import com.benhsoan.adapter.inbound.rest.response.queue.WaitingRoomBoardResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +67,15 @@ public class QueueController {
     private final ReQueueItemUseCase reQueueItemUseCase;
     private final PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     private final GetQueueHistoryUseCase getQueueHistoryUseCase;
+    private final GetQueueDisplayUseCase getQueueDisplayUseCase;
     private final QueueRestMapper mapper;
+
+    @GetMapping("/queues/display")
+    public WaitingRoomBoardResponse getWaitingRoomDisplay(
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) UUID roomId) {
+        return mapper.toResponse(getQueueDisplayUseCase.getWaitingRoomDisplay(new GetQueueDisplayQuery(date, roomId)));
+    }
 
     @GetMapping("/queues")
     @RequirePermission("QUEUE_VIEW")

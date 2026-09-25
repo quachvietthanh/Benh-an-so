@@ -80,6 +80,38 @@ public interface JpaQueueItemRepository extends JpaRepository<QueueItemEntity, U
                         join UserEntity doctor on doctor.id = queue.doctorId
                         join RoomEntity room on room.id = queue.roomId
                         join VisitEntity visit on visit.id = item.visitId
+                        where queue.queueDate = :queueDate
+                          and (:roomId is null or queue.roomId = :roomId)
+                          and item.status in (com.benhsoan.domain.queue.enums.QueueItemStatus.IN_PROGRESS, com.benhsoan.domain.queue.enums.QueueItemStatus.WAITING)
+                        order by queue.roomId,
+                          case item.priority
+                            when com.benhsoan.domain.queue.enums.QueuePriority.EMERGENCY then 1
+                            when com.benhsoan.domain.queue.enums.QueuePriority.PRIORITY then 2
+                            else 3
+                          end asc,
+                          item.prioritizedAt asc,
+                          item.queueNumber asc
+                        """)
+        List<QueueItemDetailsProjection> findActiveQueueBoardDetails(
+                        @Param("queueDate") LocalDate queueDate,
+                        @Param("roomId") UUID roomId);
+
+        @Query("""
+                        select new com.benhsoan.persistence.jpaRepository.queue.QueueItemDetailsProjection(
+                            item.id, item.medicalQueueId, item.patientId, patient.patientCode, patient.fullName,
+                            queue.doctorId, doctor.fullName, queue.roomId, room.code,
+                            item.appointmentId, item.visitId, visit.visitCode,
+                            item.sourceType, item.status, item.queueNumber, item.queueDate,
+                            item.checkedInAt, item.calledAt, item.completedAt, item.cancelledAt, item.cancelReason,
+                            item.skippedAt, item.skipReason, item.callCount,
+                            item.priority, item.priorityReason, item.prioritizedAt, item.prioritizedBy
+                        )
+                        from QueueItemEntity item
+                        join MedicalQueueEntity queue on queue.id = item.medicalQueueId
+                        join PatientEntity patient on patient.id = item.patientId
+                        join UserEntity doctor on doctor.id = queue.doctorId
+                        join RoomEntity room on room.id = queue.roomId
+                        join VisitEntity visit on visit.id = item.visitId
                         where item.id = :queueItemId
                         """)
         Optional<QueueItemDetailsProjection> findQueueItemDetailsById(@Param("queueItemId") UUID queueItemId);

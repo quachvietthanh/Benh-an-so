@@ -11,5 +11,7 @@ public interface QueueItemQueryRepository {
 
     List<QueueItemResult> findQueueBoard(LocalDate queueDate, UUID doctorId, UUID roomId);
 
+    List<QueueItemResult> findActiveQueueBoard(LocalDate queueDate, UUID roomId);
+
     Optional<QueueItemResult> findDetailById(UUID queueItemId);
 }
