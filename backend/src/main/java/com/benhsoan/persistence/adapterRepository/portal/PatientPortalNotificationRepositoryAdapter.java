@@ -58,4 +58,11 @@ public class PatientPortalNotificationRepositoryAdapter
             UUID patientId, PatientPortalNotificationType type, UUID clinicalResultId) {
         return jpaRepository.existsByPatientIdAndTypeAndClinicalResultId(patientId, type, clinicalResultId);
     }
+
+    @Override
+    public boolean existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+            UUID patientId, PatientPortalNotificationType type, UUID guardianReviewDependentPatientId) {
+        return jpaRepository.existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+                patientId, type, guardianReviewDependentPatientId);
+    }
 }

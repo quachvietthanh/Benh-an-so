@@ -34,6 +34,7 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
 
     private static final String EXTENSION = ".json";
     private static final int SNAPSHOT_FORMAT_VERSION = 1;
+    private static final java.util.regex.Pattern TABLE_NAME_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z0-9_]+$");
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -76,6 +77,154 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
     @Override
     public BackupSnapshot loadSnapshot(String fileName) {
         return new BackupSnapshot(fileName, readFile(fileName));
+    }
+
+    @Override
+    public com.benhsoan.domain.backup.BackupVerificationReport verifySnapshot(
+            java.util.UUID backupId,
+            String backupCode,
+            String fileName
+    ) {
+        java.time.Instant verifiedAt = java.time.Instant.now();
+        if (fileName == null || fileName.isBlank()) {
+            return com.benhsoan.domain.backup.BackupVerificationReport.failure(
+                    backupId,
+                    backupCode,
+                    fileName,
+                    false,
+                    0,
+                    0,
+                    null,
+                    verifiedAt,
+                    "Tên tệp sao lưu không hợp lệ.",
+                    java.util.List.of("Tên tệp sao lưu rỗng hoặc không xác định.")
+            );
+        }
+
+        byte[] fileBytes;
+        try {
+            fileBytes = readFile(fileName);
+        } catch (RuntimeException ex) {
+            String msg = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Không thể đọc tệp sao lưu";
+            return com.benhsoan.domain.backup.BackupVerificationReport.failure(
+                    backupId,
+                    backupCode,
+                    fileName,
+                    false,
+                    0,
+                    0,
+                    null,
+                    verifiedAt,
+                    "Không thể đọc tệp sao lưu: " + msg,
+                    java.util.List.of(msg)
+            );
+        }
+
+        BackupDocument document;
+        try {
+            document = readJson(fileBytes);
+        } catch (RuntimeException ex) {
+            String msg = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Tệp sao lưu không đúng định dạng JSON";
+            return com.benhsoan.domain.backup.BackupVerificationReport.failure(
+                    backupId,
+                    backupCode,
+                    fileName,
+                    true,
+                    0,
+                    0,
+                    null,
+                    verifiedAt,
+                    "Tệp sao lưu không đúng định dạng JSON: " + msg,
+                    java.util.List.of(msg)
+            );
+        }
+
+        java.util.List<String> issues = new java.util.ArrayList<>();
+        if (document == null || document.manifest() == null || document.data() == null) {
+            issues.add("Bản sao lưu thiếu phần manifest hoặc dữ liệu bảng.");
+            return com.benhsoan.domain.backup.BackupVerificationReport.failure(
+                    backupId, backupCode, fileName, true, 0, 0, null, verifiedAt,
+                    "Bản sao lưu thiếu phần manifest hoặc dữ liệu bảng.", issues);
+        }
+
+        BackupManifest manifest = document.manifest();
+        if (manifest.formatVersion() != SNAPSHOT_FORMAT_VERSION) {
+            issues.add("Phiên bản định dạng sao lưu không được hỗ trợ: " + manifest.formatVersion());
+        }
+        if (manifest.createdAt() == null || manifest.createdAt().isBlank()) {
+            issues.add("Bản sao lưu thiếu thời gian khởi tạo.");
+        } else {
+            try {
+                java.time.Instant.parse(manifest.createdAt());
+            } catch (Exception ex) {
+                issues.add("Thời gian khởi tạo trong bản sao lưu không hợp lệ: " + manifest.createdAt());
+            }
+        }
+
+        String currentSchema = currentSchemaVersion();
+        if (currentSchema == null || !currentSchema.equals(manifest.schemaVersion())) {
+            issues.add("Phiên bản schema của bản sao lưu (" + manifest.schemaVersion()
+                    + ") không khớp với database hiện tại (" + currentSchema + ").");
+        }
+
+        java.util.List<TableSnapshot> tables = document.data();
+        int tableCount = tables != null ? tables.size() : 0;
+        int totalRows = 0;
+
+        try {
+            java.util.List<String> manifestTables = normalizeTableNames(manifest.tables());
+            if (tables == null || tables.stream().anyMatch(java.util.Objects::isNull)) {
+                issues.add("Bản sao lưu chứa bảng rỗng hoặc không xác định.");
+            } else {
+                java.util.List<String> dataTables = normalizeTableNames(tables.stream().map(TableSnapshot::name).toList());
+                if (!manifestTables.equals(dataTables)) {
+                    issues.add("Danh sách bảng trong manifest không khớp với danh sách bảng thực tế.");
+                }
+                if (!java.util.Set.copyOf(manifestTables).equals(java.util.Set.copyOf(backupRestorePlan.snapshotTables()))) {
+                    issues.add("Danh sách bảng không khớp với phạm vi FULL được cấu hình.");
+                }
+
+                for (TableSnapshot table : tables) {
+                    if (table != null && table.rows() != null) {
+                        totalRows += table.rows().size();
+                    }
+                    try {
+                        validateTableColumns(table);
+                    } catch (RuntimeException ex) {
+                        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Lỗi xác thực cột bảng";
+                        issues.add("Bảng " + (table != null ? table.name() : "null") + " không hợp lệ: " + msg);
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            String msg = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Lỗi cấu trúc bảng không xác định";
+            issues.add("Lỗi cấu trúc bảng sao lưu: " + msg);
+        }
+
+        if (!issues.isEmpty()) {
+            return com.benhsoan.domain.backup.BackupVerificationReport.failure(
+                    backupId,
+                    backupCode,
+                    fileName,
+                    true,
+                    tableCount,
+                    totalRows,
+                    manifest.schemaVersion(),
+                    verifiedAt,
+                    "Phát hiện " + issues.size() + " lỗi toàn vẹn trong bản sao lưu.",
+                    issues
+            );
+        }
+
+        return com.benhsoan.domain.backup.BackupVerificationReport.success(
+                backupId,
+                backupCode,
+                fileName,
+                tableCount,
+                totalRows,
+                manifest.schemaVersion(),
+                verifiedAt
+        );
     }
 
     @Override
@@ -242,6 +391,14 @@ public class JsonDatabaseBackupStorageAdapter implements DatabaseBackupStoragePo
     }
 
     private Map<String, Integer> databaseColumns(String tableName) {
+        if (tableName == null || !TABLE_NAME_PATTERN.matcher(tableName).matches()) {
+            throw new BackupExecutionException("Invalid table name: " + tableName);
+        }
+        boolean isWhitelisted = backupRestorePlan.snapshotTables().stream()
+                .anyMatch(allowed -> allowed.equalsIgnoreCase(tableName));
+        if (!isWhitelisted) {
+            throw new BackupExecutionException("Table is not in allowed backup snapshot tables: " + tableName);
+        }
         return jdbcTemplate.query("SELECT * FROM " + tableName + " WHERE 1 = 0", (ResultSetExtractor<Map<String, Integer>>) rs -> {
             Map<String, Integer> columns = new LinkedHashMap<>();
             ResultSetMetaData metadata = rs.getMetaData();

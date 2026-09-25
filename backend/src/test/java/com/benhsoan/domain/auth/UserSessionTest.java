@@ -128,4 +128,51 @@ class UserSessionTest {
         assertEquals(lastUsedAt, session.getLastUsedAt());
         assertFalse(session.isRevoked());
     }
+
+    @Test
+    @DisplayName("Gia hạn phiên hợp lệ cập nhật lastUsedAt")
+    void extendValidSession() {
+        UserSession session = UserSession.create(
+                UUID.randomUUID(), "hash", Instant.now().plusSeconds(3600)
+        );
+        Instant newTime = Instant.now().plusSeconds(300);
+        session.extend(newTime, Duration.ofMinutes(30));
+
+        assertEquals(newTime, session.getLastUsedAt());
+    }
+
+    @Test
+    @DisplayName("Gia hạn phiên bị từ chối nếu phiên đã bị ngắt")
+    void extendRevokedSessionThrowsValidationException() {
+        UserSession session = UserSession.create(
+                UUID.randomUUID(), "hash", Instant.now().plusSeconds(3600)
+        );
+        session.revoke(Instant.now());
+
+        assertThrows(com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> session.extend(Instant.now(), Duration.ofMinutes(30)));
+    }
+
+    @Test
+    @DisplayName("Gia hạn phiên bị từ chối nếu phiên đã hết hạn refresh")
+    void extendExpiredSessionThrowsValidationException() {
+        UserSession session = UserSession.create(
+                UUID.randomUUID(), "hash", Instant.now().minusSeconds(60)
+        );
+
+        assertThrows(com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> session.extend(Instant.now(), Duration.ofMinutes(30)));
+    }
+
+    @Test
+    @DisplayName("Gia hạn phiên bị từ chối nếu phiên đã idle timeout")
+    void extendIdleTimeoutSessionThrowsValidationException() {
+        UserSession session = UserSession.create(
+                UUID.randomUUID(), "hash", Instant.now().plusSeconds(3600)
+        );
+        session.updateLastUsed(Instant.now().minusSeconds(1900));
+
+        assertThrows(com.benhsoan.domain.shared.exception.ValidationException.class,
+                () -> session.extend(Instant.now(), Duration.ofMinutes(30)));
+    }
 }

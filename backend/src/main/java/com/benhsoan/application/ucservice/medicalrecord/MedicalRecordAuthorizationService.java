@@ -41,6 +41,24 @@ public class MedicalRecordAuthorizationService {
         return currentUserPort.getCurrentUserId();
     }
 
+    public UUID requireArchiveManageAccess() {
+        if (!permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_MANAGE")) {
+            authorizationAuditService.recordArchiveAccessDenied(currentUserPort.getCurrentUserId(),
+                    "Medical record archive manage access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return currentUserPort.getCurrentUserId();
+    }
+
+    public UUID requireArchiveReadAccess() {
+        if (!permissionEvaluator.hasPermission("MEDICAL_RECORD_ARCHIVE_READ")) {
+            authorizationAuditService.recordArchiveAccessDenied(currentUserPort.getCurrentUserId(),
+                    "Medical record archive read access denied");
+            throw new MedicalRecordAccessDeniedException();
+        }
+        return currentUserPort.getCurrentUserId();
+    }
+
     public UUID requireContentWriteAccess(UUID medicalRecordId) {
         UUID actorId = currentUserPort.getCurrentUserId();
         if (!currentUserPort.hasRole("DOCTOR") || currentUserPort.hasRole("ADMIN")) {
@@ -130,5 +148,13 @@ public class MedicalRecordAuthorizationService {
             throw new MedicalRecordAccessDeniedException();
         }
         return actorId;
+    }
+
+    public void ensureNotArchived(com.benhsoan.domain.medicalrecord.MedicalRecord record, UUID actorId, String action) {
+        if (record.isArchived()) {
+            authorizationAuditService.recordArchiveAccessDenied(actorId, record.getId(),
+                    "Medical record modification denied: record is archived (QTN-19). Action: " + action);
+            throw new com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException();
+        }
     }
 }

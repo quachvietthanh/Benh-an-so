@@ -43,6 +43,7 @@ public class UpdateMedicalRecordService implements UpdateMedicalRecordUseCase {
         UUID userId = authorizationService.requireContentWriteAccess(medicalRecordId);
         MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
+        authorizationService.ensureNotArchived(record, userId, "Cập nhật nội dung bệnh án");
         record.ensureEditable();
         Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));

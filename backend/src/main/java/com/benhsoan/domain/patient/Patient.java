@@ -11,6 +11,7 @@ import com.benhsoan.domain.patient.enums.PatientStatus;
 import com.benhsoan.domain.patient.enums.PregnancyStatus;
 import com.benhsoan.domain.patient.exception.PatientAlreadyMergedException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
+import com.benhsoan.domain.patient.exception.PatientInactiveException;
 import com.benhsoan.domain.shared.Guard.Guard;
 
 import lombok.AccessLevel;
@@ -648,6 +649,21 @@ public class Patient {
     public void validateCanBeUpdated() {
         if (this.isMerged()) {
             throw new PatientAlreadyMergedException(this.id, this.mergedIntoPatientId);
+        }
+    }
+
+    /**
+     * NCL-14-CN-010 (QTN-33): a patient may only receive NEW activity when the profile is a
+     * valid, active, non-merged record. Merged records are read-only lookup targets and
+     * deactivated records must not gain new appointments. Existing historical records are
+     * unaffected: this guard is only applied where new activity is created.
+     */
+    public void validateCanReceiveNewActivity() {
+        if (this.isMerged()) {
+            throw new PatientAlreadyMergedException(this.id, this.mergedIntoPatientId);
+        }
+        if (!this.active || this.status != PatientStatus.ACTIVE) {
+            throw new PatientInactiveException();
         }
     }
 

@@ -33,6 +33,14 @@ public class PatientPortalNotification {
     private UUID rescheduleLogId;
     private UUID clinicalResultId;
 
+    /**
+     * NCL-14-CN-010 TC-03: for {@code GUARDIAN_LINK_REVIEW} notifications this holds the
+     * dependent patient whose adulthood triggered the review. It is the idempotency key for
+     * that category (one review notification per recipient per dependent) and null for every
+     * other notification type.
+     */
+    private UUID guardianReviewDependentPatientId;
+
     private PatientPortalNotification(
             UUID id,
             UUID patientId,
@@ -43,7 +51,8 @@ public class PatientPortalNotification {
             Instant createdAt,
             UUID appointmentId,
             UUID rescheduleLogId,
-            UUID clinicalResultId
+            UUID clinicalResultId,
+            UUID guardianReviewDependentPatientId
     ) {
         this.id = Objects.requireNonNull(id);
         this.patientId = Objects.requireNonNull(patientId);
@@ -55,6 +64,7 @@ public class PatientPortalNotification {
         this.appointmentId = appointmentId;
         this.rescheduleLogId = rescheduleLogId;
         this.clinicalResultId = clinicalResultId;
+        this.guardianReviewDependentPatientId = guardianReviewDependentPatientId;
     }
 
     public static PatientPortalNotification reminder(
@@ -66,7 +76,7 @@ public class PatientPortalNotification {
     ) {
         return new PatientPortalNotification(UUID.randomUUID(), patientId,
                 PatientPortalNotificationType.APPOINTMENT_REMINDER, title, message,
-                null, createdAt, appointmentId, null, null);
+                null, createdAt, appointmentId, null, null, null);
     }
 
     public static PatientPortalNotification changed(
@@ -79,7 +89,7 @@ public class PatientPortalNotification {
     ) {
         return new PatientPortalNotification(UUID.randomUUID(), patientId,
                 PatientPortalNotificationType.APPOINTMENT_CHANGED, title, message,
-                null, createdAt, appointmentId, rescheduleLogId, null);
+                null, createdAt, appointmentId, rescheduleLogId, null, null);
     }
 
     public static PatientPortalNotification labResultAvailable(
@@ -91,7 +101,25 @@ public class PatientPortalNotification {
     ) {
         return new PatientPortalNotification(UUID.randomUUID(), patientId,
                 PatientPortalNotificationType.LAB_RESULT_AVAILABLE, title, message,
-                null, createdAt, null, null, clinicalResultId);
+                null, createdAt, null, null, clinicalResultId, null);
+    }
+
+    /**
+     * NCL-14-CN-010 TC-03: guardian-link review reminder. {@code patientId} is the recipient
+     * (the dependent's own portal profile, or the guardian's portal profile) and
+     * {@code dependentPatientId} identifies the link being reviewed, which also acts as the
+     * idempotency key so repeated sweeps never duplicate the reminder.
+     */
+    public static PatientPortalNotification guardianLinkReview(
+            UUID patientId,
+            String title,
+            String message,
+            UUID dependentPatientId,
+            Instant createdAt
+    ) {
+        return new PatientPortalNotification(UUID.randomUUID(), patientId,
+                PatientPortalNotificationType.GUARDIAN_LINK_REVIEW, title, message,
+                null, createdAt, null, null, null, dependentPatientId);
     }
 
     public static PatientPortalNotification restore(
@@ -104,10 +132,12 @@ public class PatientPortalNotification {
             Instant createdAt,
             UUID appointmentId,
             UUID rescheduleLogId,
-            UUID clinicalResultId
+            UUID clinicalResultId,
+            UUID guardianReviewDependentPatientId
     ) {
         return new PatientPortalNotification(id, patientId, type, title, message,
-                readAt, createdAt, appointmentId, rescheduleLogId, clinicalResultId);
+                readAt, createdAt, appointmentId, rescheduleLogId, clinicalResultId,
+                guardianReviewDependentPatientId);
     }
 
     public boolean isRead() {

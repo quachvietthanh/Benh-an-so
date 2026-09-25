@@ -29,6 +29,7 @@ import com.benhsoan.port.outbound.repository.reporting.DoctorVisitSummary;
 import com.benhsoan.port.outbound.repository.reporting.InvoiceLineReportDetail;
 import com.benhsoan.port.outbound.repository.reporting.OperationalReportQueryRepository;
 import com.benhsoan.port.outbound.repository.reporting.TopMedicineSummary;
+import com.benhsoan.port.outbound.repository.reporting.VisitReportDetailItem;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -571,6 +572,56 @@ public class OperationalReportQueryRepositoryAdapter implements OperationalRepor
 
         Long count = query.getSingleResult();
         return count != null && count > 0;
+    }
+
+    @Override
+    public List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive) {
+        return findCompletedVisitDetails(fromInclusive, toExclusive, null);
+    }
+
+    @Override
+    public List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive, UUID doctorId) {
+        return entityManager.createQuery("""
+                select visit.id,
+                       visit.visitCode,
+                       visit.completedAt,
+                       patient.id,
+                       patient.patientCode,
+                       patient.fullName,
+                       patient.phone,
+                       patient.address,
+                       doctor.id,
+                       doctor.fullName,
+                       cast(visit.status as string)
+                from VisitEntity visit
+                left join PatientEntity patient on patient.id = visit.patientId
+                left join UserEntity doctor on doctor.id = visit.doctorId
+                where visit.status = :completedStatus
+                  and visit.completedAt >= :fromInclusive
+                  and visit.completedAt < :toExclusive
+                  and (:doctorId is null or visit.doctorId = :doctorId)
+                order by visit.completedAt asc, visit.visitCode asc
+                """, Object[].class)
+                .setParameter("completedStatus", VisitStatus.COMPLETED)
+                .setParameter("fromInclusive", fromInclusive)
+                .setParameter("toExclusive", toExclusive)
+                .setParameter("doctorId", doctorId)
+                .getResultList()
+                .stream()
+                .map(row -> new VisitReportDetailItem(
+                        (UUID) row[0],
+                        (String) row[1],
+                        (Instant) row[2],
+                        (UUID) row[3],
+                        (String) row[4],
+                        (String) row[5],
+                        (String) row[6],
+                        (String) row[7],
+                        (UUID) row[8],
+                        (String) row[9],
+                        (String) row[10]
+                ))
+                .toList();
     }
 
     private LocalDate toLocalDate(Object value) {

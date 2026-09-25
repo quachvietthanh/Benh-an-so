@@ -43,6 +43,7 @@ public class UpdateInstructionsAndTreatmentPlanService implements UpdateInstruct
         UUID userId = authorizationService.requireContentWriteAccess(medicalRecordId);
         MedicalRecord record = medicalRecordRepository.findByIdForUpdate(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
+        authorizationService.ensureNotArchived(record, userId, "Cập nhật lời dặn và kế hoạch điều trị");
         record.ensureEditable();
         Visit visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));

@@ -113,6 +113,7 @@ class OverdueMedicalRecordSecurityIntegrationTest {
     @MockitoBean private ArchiveMedicalRecordUseCase archiveMedicalRecordUseCase;
     @MockitoBean private DeleteMedicalRecordUseCase deleteMedicalRecordUseCase;
     @MockitoBean private IssueMedicalRecordCopyUseCase issueMedicalRecordCopyUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.medicalrecord.ExportMedicalRecordExchangeUseCase exportMedicalRecordExchangeUseCase;
     @MockitoBean private GetMedicalRecordVersionHistoryUseCase getMedicalRecordVersionHistoryUseCase;
     @MockitoBean private GetOverdueMedicalRecordsUseCase getOverdueMedicalRecordsUseCase;
     @MockitoBean private SendSigningReminderUseCase sendSigningReminderUseCase;

@@ -10,8 +10,19 @@ import com.benhsoan.port.dto.result.OperationalReportExportResult;
 public interface ExportOperationalReportUseCase {
 
     default OperationalReportExportResult export(ReportType reportType, LocalDate from, LocalDate to) {
-        return export(reportType, from, to, null);
+        return export(reportType, from, to, null, false, null);
     }
 
-    OperationalReportExportResult export(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId);
+    default OperationalReportExportResult export(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId) {
+        return export(reportType, from, to, doctorId, false, null);
+    }
+
+    OperationalReportExportResult export(
+            ReportType reportType,
+            LocalDate from,
+            LocalDate to,
+            UUID doctorId,
+            boolean unmask,
+            String reason
+    );
 }

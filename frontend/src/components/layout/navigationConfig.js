@@ -25,6 +25,7 @@ import {
   PrinterOutlined,
   FileExcelOutlined,
   PercentageOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons'
 
 export const roleNames = {
@@ -40,7 +41,7 @@ export const navigationSections = [
   { key: 'overview', paths: ['/'] },
   { key: 'reception', label: 'Tiếp nhận & Chăm sóc', paths: ['/patients', '/patients/import', '/appointments', '/appointments/weekly-schedule', '/after-care', '/visit-summaries', '/doctor-schedules'] },
   { key: 'examination', label: 'Khám bệnh', paths: ['/medical-records', '/medical-records/overdue-signing', '/medical-records/version-history', '/medical-records/copy-issuance', '/medical-records/visit-summaries', '/prescriptions', '/clinical-orders', '/clinical-results', '/results'] },
-  { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts', '/inventory/stock-report', '/pharmacy/special-control-register'] },
+  { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts', '/inventory/stock-report', '/pharmacy/special-control-register', '/pharmacy/procurement-plans'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing', '/invoices/lookup', '/cashier-shifts/close', '/cashier-shifts/history', '/invoices/discount-requests'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns', '/reports/revenue-breakdown', '/reports/appointment-effectiveness'] },
   { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/specialties', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization', '/contraindication-rules'] },
@@ -91,6 +92,7 @@ export const getNavigationItems = (rolesOrUser = [], permissionsArg = []) => {
     { key: '/pharmacy/receipts', label: 'Nhập kho theo lô', icon: InboxOutlined, check: () => !isAdmin && !isDoctor && !isManager && (hasPerm('PHARMACY_CREATE') || isPharmacist) },
     { key: '/inventory/stock-report', label: 'Báo cáo xuất nhập tồn', icon: BarChartOutlined, check: () => !isDoctor && !isReceptionist && (hasPerm('INVENTORY_REPORT_VIEW') || isPharmacist || isManager || isAdmin) },
     { key: '/pharmacy/special-control-register', label: 'Sổ theo dõi thuốc KSĐB', icon: AuditOutlined, check: () => isPharmacist || isDoctor || isAdmin },
+    { key: '/pharmacy/procurement-plans', label: 'Dự trù mua thuốc', icon: ShoppingCartOutlined, check: () => !isDoctor && !isReceptionist && (hasPerm('MEDICATION_PROCUREMENT_READ') || isPharmacist || isManager || isAdmin) },
     { key: '/billing', label: 'Thu phí & hóa đơn', icon: FileTextOutlined, check: () => !isAdmin && !isDoctor && (hasPerm('INVOICE_READ') || hasPerm('INVOICE_CREATE') || isManager || isReceptionist) },
     { key: '/invoices/discount-requests', label: 'Duyệt giảm giá & miễn phí', icon: PercentageOutlined, check: () => !isDoctor && !isPharmacist && (hasPerm('INVOICE_READ') || isReceptionist || isManager || isAdmin) },
     { key: '/invoices/lookup', label: 'Tra cứu & in lại hóa đơn', icon: PrinterOutlined, check: () => !isDoctor && !isPharmacist && (hasPerm('INVOICE_READ') || isReceptionist || isManager || isAdmin) },

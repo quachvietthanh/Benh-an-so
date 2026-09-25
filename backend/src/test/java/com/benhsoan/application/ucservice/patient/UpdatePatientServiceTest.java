@@ -49,6 +49,8 @@ class UpdatePatientServiceTest {
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository;
     @Mock private com.benhsoan.port.outbound.time.ClockPort clockPort;
+    @Mock private com.benhsoan.port.outbound.repository.auth.UserRepository userRepository;
+    @Mock private com.benhsoan.port.outbound.repository.auth.RoleRepository roleRepository;
 
     private UpdatePatientService service;
     private final UUID currentUserId = UUID.randomUUID();
@@ -66,7 +68,9 @@ class UpdatePatientServiceTest {
                 changeDetailBuilder,
                 auditLogRepository,
                 patientConsentHistoryRepository,
-                clockPort
+                clockPort,
+                userRepository,
+                roleRepository
         );
 
         lenient().when(currentUserPort.getCurrentUserId()).thenReturn(currentUserId);
@@ -1271,5 +1275,323 @@ class UpdatePatientServiceTest {
 
         assertThrows(PatientAlreadyMergedException.class, () -> service.update(patientId, command));
         verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    // ------------------------------------------------------------------
+    // NCL-14-CN-010: staff-only guardian assignment via PUT /patients/{patientId}
+    // ------------------------------------------------------------------
+
+    private static final LocalDate MINOR_DOB = LocalDate.of(2015, 5, 10);
+    private static final LocalDate ADULT_DOB = LocalDate.of(1995, 5, 10);
+
+    private Patient restoredPatient(
+            UUID patientId,
+            LocalDate dateOfBirth,
+            UUID portalUserId,
+            String guardianName,
+            UUID storedGuardianUserId
+    ) {
+        return Patient.restore(
+                patientId, "BN000002", "Nguyen Van Con", dateOfBirth, Gender.MALE,
+                null, null, "123 Street", null, null, BloodType.O_POSITIVE,
+                "Nguyen Van Cha", "Bo", "0909998877",
+                guardianName, "Bo", "0909998877", null,
+                storedGuardianUserId, guardianName,
+                true, java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                portalUserId, currentUserId,
+                true, java.time.Instant.parse("2026-01-01T00:00:00Z"), "v1.0",
+                false, null, null, false);
+    }
+
+    private UpdatePatientCommand.UpdatePatientCommandBuilder guardianCommand(LocalDate dateOfBirth) {
+        return UpdatePatientCommand.builder()
+                .fullName("Nguyen Van Con")
+                .dateOfBirth(dateOfBirth)
+                .gender(Gender.MALE)
+                .guardianName("Nguyen Van Cha")
+                .guardianRelationship("Bo")
+                .guardianPhone("0909998877")
+                .active(true);
+    }
+
+    private com.benhsoan.domain.auth.User guardianUser(UUID userId, UUID roleId, boolean active) {
+        return com.benhsoan.domain.auth.User.restore(
+                userId, "guardian1", "hash", "Nguyen Van Cha", "guardian1@example.com",
+                "0909998877", roleId, active, null,
+                java.time.Instant.parse("2026-01-01T00:00:00Z"));
+    }
+
+    private com.benhsoan.domain.auth.Role patientRole(UUID roleId) {
+        return com.benhsoan.domain.auth.Role.restore(
+                roleId, "PATIENT", null, true,
+                java.time.Instant.parse("2026-01-01T00:00:00Z"),
+                java.time.Instant.parse("2026-01-01T00:00:00Z"), java.util.Set.of());
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: gan nguoi giam ho hop le cho ho so chua thanh nien")
+    void assignsValidGuardianUserId() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, MINOR_DOB, null, "Nguyen Van Cha", null)));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.findById(guardianUserId))
+                .thenReturn(Optional.of(guardianUser(guardianUserId, roleId, true)));
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole(roleId)));
+        when(patientRepository.findByUserId(guardianUserId)).thenReturn(Optional.empty());
+
+        PatientResult result = service.update(
+                patientId,
+                guardianCommand(MINOR_DOB).guardianUserId(guardianUserId).build());
+
+        assertEquals(guardianUserId, result.guardianUserId());
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: tai khoan khong co vai tro PATIENT khong the lam nguoi giam ho")
+    void rejectsGuardianWithoutPatientRole() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        UUID patientRoleId = UUID.randomUUID();
+        UUID adminRoleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, MINOR_DOB, null, "Nguyen Van Cha", null)));
+        when(userRepository.findById(guardianUserId))
+                .thenReturn(Optional.of(guardianUser(guardianUserId, adminRoleId, true)));
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole(patientRoleId)));
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(MINOR_DOB).guardianUserId(guardianUserId).build()));
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: tai khoan nguoi giam ho bi vo hieu hoa bi tu choi")
+    void rejectsInactiveGuardian() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, MINOR_DOB, null, "Nguyen Van Cha", null)));
+        when(userRepository.findById(guardianUserId))
+                .thenReturn(Optional.of(guardianUser(guardianUserId, roleId, false)));
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(MINOR_DOB).guardianUserId(guardianUserId).build()));
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: khong tim thay tai khoan nguoi giam ho thi tu choi")
+    void rejectsUnknownGuardianUser() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, MINOR_DOB, null, "Nguyen Van Cha", null)));
+        when(userRepository.findById(guardianUserId)).thenReturn(Optional.empty());
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(MINOR_DOB).guardianUserId(guardianUserId).build()));
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: benh nhan khong the tu gan chinh minh lam nguoi giam ho")
+    void rejectsSelfGuardianLink() {
+        UUID patientId = UUID.randomUUID();
+        UUID ownPortalUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, MINOR_DOB, ownPortalUserId, "Nguyen Van Cha", null)));
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(MINOR_DOB).guardianUserId(ownPortalUserId).build()));
+
+        verify(userRepository, never()).findById(any());
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: chan lien ket giam ho vong (A <-> B) voi ID dung kieu (P1.1)")
+    void rejectsGuardianCycle() {
+        // Realistic data model: a patient id, a patient-portal user id, and a guardian account id
+        // are three DIFFERENT identifiers. guardian_user_id references users(id), so the cycle
+        // guard must compare users.id values only.
+        UUID patientAId = UUID.randomUUID();
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID patientBId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientAId))
+                .thenReturn(Optional.of(restoredPatient(patientAId, MINOR_DOB, userA, "Nguyen Van Cha", null)));
+        when(userRepository.findById(userB))
+                .thenReturn(Optional.of(guardianUser(userB, roleId, true)));
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole(roleId)));
+        // B's guardian account is A's portal account => A -> B -> A would be created.
+        when(patientRepository.findByUserId(userB))
+                .thenReturn(Optional.of(restoredPatient(patientBId, MINOR_DOB, userB, "Nguyen Van Cha", userA)));
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientAId,
+                guardianCommand(MINOR_DOB).guardianUserId(userB).build()));
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010 P1.1: chan vong phai dung userId, khong so sanh patientId voi userId")
+    void cycleGuardDoesNotConfusePatientIdWithUserId() {
+        // Regression for the ID-type bug: the guardian's stored guardianUserId happened to equal
+        // the TARGET patient's patientId. Under the buggy comparison that coincidence rejected a
+        // perfectly legal link; with the correct users.id comparison it must be allowed.
+        UUID patientAId = UUID.randomUUID();
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID patientBId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientAId))
+                .thenReturn(Optional.of(restoredPatient(patientAId, MINOR_DOB, userA, "Nguyen Van Cha", null)));
+        when(userRepository.findById(userB))
+                .thenReturn(Optional.of(guardianUser(userB, roleId, true)));
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole(roleId)));
+        // B's guardianUserId equals A's PATIENT id, not A's USER id: not a real cycle.
+        when(patientRepository.findByUserId(userB))
+                .thenReturn(Optional.of(restoredPatient(patientBId, MINOR_DOB, userB, "Nguyen Van Cha", patientAId)));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResult result = service.update(
+                patientAId,
+                guardianCommand(MINOR_DOB).guardianUserId(userB).build());
+
+        assertEquals(userB, result.guardianUserId());
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010 P1.1: guardian khong co ho so benh nhan thi khong tao vong")
+    void guardianWithoutPatientProfileIsAccepted() {
+        UUID patientAId = UUID.randomUUID();
+        UUID userA = UUID.randomUUID();
+        UUID userB = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientAId))
+                .thenReturn(Optional.of(restoredPatient(patientAId, MINOR_DOB, userA, "Nguyen Van Cha", null)));
+        when(userRepository.findById(userB))
+                .thenReturn(Optional.of(guardianUser(userB, roleId, true)));
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole(roleId)));
+        when(patientRepository.findByUserId(userB)).thenReturn(Optional.empty());
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResult result = service.update(
+                patientAId,
+                guardianCommand(MINOR_DOB).guardianUserId(userB).build());
+
+        assertEquals(userB, result.guardianUserId());
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010 P2.1: khong gan duoc nguoi giam ho cho ho so da thanh nien (QTN-44)")
+    void rejectsGuardianAssignmentForAdultPatient() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, ADULT_DOB, null, null, null)));
+
+        ValidationException exception = assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(ADULT_DOB).guardianUserId(guardianUserId).build()));
+
+        assertEquals("guardianUserId", exception.getField());
+        // The adult check runs first, so no guardian lookup happens at all.
+        verify(userRepository, never()).findById(any());
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010 P2.1: dung 18 tuoi thi khong con la nguoi chua thanh nien")
+    void rejectsGuardianAssignmentWhenExactlyEighteenYearsOld() {
+        UUID patientId = UUID.randomUUID();
+        UUID guardianUserId = UUID.randomUUID();
+        LocalDate exactlyEighteenToday = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+                .minusYears(18);
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(patientId, exactlyEighteenToday, null, null, null)));
+
+        assertThrows(ValidationException.class, () -> service.update(
+                patientId,
+                guardianCommand(exactlyEighteenToday).guardianUserId(guardianUserId).build()));
+
+        verify(patientRepository, never()).save(any(Patient.class));
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010 P2.1: bo trong guardianUserId tren ho so nguoi lon duoc phep")
+    void omittingGuardianUserIdOnAdultPatientIsAllowed() {
+        UUID patientId = UUID.randomUUID();
+        UUID storedGuardianUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(
+                        patientId, ADULT_DOB, null, "Nguyen Van Cha", storedGuardianUserId)));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResult result = service.update(patientId, guardianCommand(ADULT_DOB).build());
+
+        assertEquals(storedGuardianUserId, result.guardianUserId());
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: bo trong guardianUserId thi giu nguyen gia tri dang luu")
+    void preservesStoredGuardianUserIdWhenOmitted() {
+        UUID patientId = UUID.randomUUID();
+        UUID storedGuardianUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(
+                        patientId, MINOR_DOB, null, "Nguyen Van Cha", storedGuardianUserId)));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResult result = service.update(patientId, guardianCommand(MINOR_DOB).build());
+
+        assertEquals(storedGuardianUserId, result.guardianUserId());
+        verify(userRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("NCL-14-CN-010: transitionToAdult xoa guardianUserId")
+    void transitionToAdultClearsGuardianUserId() {
+        UUID patientId = UUID.randomUUID();
+        UUID storedGuardianUserId = UUID.randomUUID();
+
+        when(patientRepository.findByIdForUpdate(patientId))
+                .thenReturn(Optional.of(restoredPatient(
+                        patientId, ADULT_DOB, null, "Nguyen Van Cha", storedGuardianUserId)));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PatientResult result = service.update(
+                patientId,
+                guardianCommand(ADULT_DOB).transitionToAdult(true).build());
+
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianUserId());
+        org.junit.jupiter.api.Assertions.assertNull(result.guardianName());
     }
 }
