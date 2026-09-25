@@ -1,5 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.queue;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,14 @@ public class RoomRepositoryAdapter implements RoomRepository {
     @Override
     public Optional<Room> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Room> findAllById(Iterable<UUID> roomIds) {
+        if (roomIds == null) {
+            return List.of();
+        }
+        return jpaRepository.findAllById(roomIds).stream().map(mapper::toDomain).toList();
     }
 
     @Override

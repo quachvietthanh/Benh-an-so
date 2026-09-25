@@ -98,4 +98,26 @@ public class MedicalRecordAuthorizationAuditService {
                     actorId, visitId, exception.getMessage());
         }
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordArchiveAccessDenied(UUID actorId, String detail) {
+        recordArchiveAccessDenied(actorId, null, detail);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordArchiveAccessDenied(UUID actorId, UUID medicalRecordId, String detail) {
+        try {
+            auditLogRepository.save(AuditLog.create(
+                    actorId,
+                    ActionType.ACCESS_DENIED,
+                    ResourceType.MEDICAL_RECORD,
+                    medicalRecordId,
+                    detail,
+                    null
+            ));
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record archive access denied audit log for actor {} on medical record {}: {}",
+                    actorId, medicalRecordId, exception.getMessage());
+        }
+    }
 }

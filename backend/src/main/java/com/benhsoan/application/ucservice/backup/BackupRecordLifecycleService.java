@@ -42,8 +42,13 @@ class BackupRecordLifecycleService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(UUID backupId) {
+        markFailed(backupId, null);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markFailed(UUID backupId, String failureReason) {
         BackupRecord record = findById(backupId);
-        record.markFailed();
+        record.markFailed(failureReason);
         backupRecordRepository.save(record);
     }
 

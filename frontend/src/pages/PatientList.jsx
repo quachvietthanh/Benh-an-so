@@ -33,6 +33,7 @@ import {
   UserOutlined,
   UsergroupDeleteOutlined,
   MergeCellsOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import patientApi from '../api/patientApi'
@@ -82,9 +83,13 @@ function PatientList() {
     return (user?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
   }, [user])
 
+  const userRoles = useMemo(() => {
+    return (user?.roles || []).map((r) => String(r || '').toLowerCase().replace(/^role_/, ''))
+  }, [user])
   const canCreatePatient = userPermissions.includes('PATIENT_CREATE')
   const canUpdatePatient = userPermissions.includes('PATIENT_UPDATE')
   const canReadPatient = userPermissions.includes('PATIENT_READ')
+  const canImportPatient = userPermissions.includes('PATIENT_IMPORT') || userRoles.includes('admin') || userRoles.includes('receptionist')
   const canBookAppointment = userPermissions.includes('APPOINTMENT_CREATE') || userPermissions.includes('APPOINTMENT_READ')
   const canManage = canCreatePatient || canUpdatePatient
   const canMerge = canUserMergePatients(user?.roles, userPermissions)
@@ -536,6 +541,11 @@ ${rowsXml}
               </Button>
             )}
             <Button icon={<DownloadOutlined />} onClick={exportPatients}>Xuất Excel</Button>
+            {canImportPatient && (
+              <Button icon={<UploadOutlined />} onClick={() => navigate('/patients/import')}>
+                Nhập từ Excel
+              </Button>
+            )}
             {canCreatePatient && <Button type="primary" icon={<PlusOutlined />} onClick={() => setRegisterOpen(true)}>Thêm bệnh nhân</Button>}
           </Space>
         </header>

@@ -34,6 +34,10 @@ public class UserSession {
 
     private Instant revokedAt;
 
+    private String ipAddress;
+
+    private String userAgent;
+
     private UserSession(
             UUID id,
             UUID userId,
@@ -42,7 +46,9 @@ public class UserSession {
             Instant refreshExpiresAt,
             Instant createdAt,
             Instant lastUsedAt,
-            Instant revokedAt
+            Instant revokedAt,
+            String ipAddress,
+            String userAgent
     ) {
         this.id = Guard.require(id, "Session id");
         this.userId = Guard.require(userId, "User id");
@@ -53,12 +59,24 @@ public class UserSession {
 
         this.lastUsedAt = lastUsedAt;
         this.revokedAt = revokedAt;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
     }
 
     public static UserSession create(
             UUID userId,
             String refreshTokenHash,
             Instant refreshExpiresAt
+    ) {
+        return create(userId, refreshTokenHash, refreshExpiresAt, null, null);
+    }
+
+    public static UserSession create(
+            UUID userId,
+            String refreshTokenHash,
+            Instant refreshExpiresAt,
+            String ipAddress,
+            String userAgent
     ) {
         Instant now = Instant.now();
 
@@ -70,7 +88,9 @@ public class UserSession {
                 refreshExpiresAt,
                 now,
                 now,
-                null
+                null,
+                ipAddress,
+                userAgent
         );
     }
 
@@ -90,7 +110,11 @@ public class UserSession {
             Instant now,
             Duration timeout
     ) {
-        return now.isAfter(lastUsedAt.plus(timeout));
+        if (timeout == null) {
+            return false;
+        }
+        Instant referenceTime = lastUsedAt != null ? lastUsedAt : createdAt;
+        return referenceTime != null && now.isAfter(referenceTime.plus(timeout));
     }
 
     public boolean isActive(
@@ -110,6 +134,19 @@ public class UserSession {
         Instant now = Instant.now();
         this.lastUsedAt = now;
         this.refreshExpiresAt = now.plus(timeout);
+    }
+
+    public void extend(Instant now, Duration idleTimeout) {
+        if (isRevoked()) {
+            throw new com.benhsoan.domain.shared.exception.ValidationException("Cannot extend a revoked session.");
+        }
+        if (isRefreshExpired(now)) {
+            throw new com.benhsoan.domain.shared.exception.ValidationException("Cannot extend an expired session.");
+        }
+        if (idleTimeout != null && isIdleTimeout(now, idleTimeout)) {
+            throw new com.benhsoan.domain.shared.exception.ValidationException("Cannot extend an idle timed-out session.");
+        }
+        this.lastUsedAt = Guard.require(now, "Now");
     }
 
     public boolean matchesPreviousRefreshTokenHash(String refreshTokenHash) {
@@ -138,6 +175,32 @@ public class UserSession {
             Instant lastUsedAt,
             Instant revokedAt
     ) {
+        return restore(
+                id,
+                userId,
+                refreshTokenHash,
+                previousRefreshTokenHash,
+                refreshExpiresAt,
+                createdAt,
+                lastUsedAt,
+                revokedAt,
+                null,
+                null
+        );
+    }
+
+    public static UserSession restore(
+            UUID id,
+            UUID userId,
+            String refreshTokenHash,
+            String previousRefreshTokenHash,
+            Instant refreshExpiresAt,
+            Instant createdAt,
+            Instant lastUsedAt,
+            Instant revokedAt,
+            String ipAddress,
+            String userAgent
+    ) {
         return new UserSession(
                 id,
                 userId,
@@ -146,7 +209,9 @@ public class UserSession {
                 refreshExpiresAt,
                 createdAt,
                 lastUsedAt,
-                revokedAt
+                revokedAt,
+                ipAddress,
+                userAgent
         );
     }
 }

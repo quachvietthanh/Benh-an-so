@@ -22,7 +22,9 @@ public class UserSessionPersistenceMapper {
                 entity.getRefreshExpiresAt(),
                 entity.getCreatedAt(),
                 entity.getLastUsedAt(),
-                entity.getRevokedAt()
+                entity.getRevokedAt(),
+                entity.getIpAddress(),
+                entity.getUserAgent()
         );
     }
 
@@ -41,6 +43,8 @@ public class UserSessionPersistenceMapper {
                 .createdAt(domain.getCreatedAt())
                 .lastUsedAt(domain.getLastUsedAt())
                 .revokedAt(domain.getRevokedAt())
+                .ipAddress(domain.getIpAddress())
+                .userAgent(domain.getUserAgent())
                 .build();
     }
 }

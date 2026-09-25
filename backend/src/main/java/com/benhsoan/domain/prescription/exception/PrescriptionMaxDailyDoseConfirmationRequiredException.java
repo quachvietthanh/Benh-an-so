@@ -2,14 +2,14 @@ package com.benhsoan.domain.prescription.exception;
 
 import java.util.List;
 
+import com.benhsoan.domain.prescription.MaxDailyDoseWarning;
 import com.benhsoan.domain.shared.exception.DomainErrorCode;
-import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
 
 public class PrescriptionMaxDailyDoseConfirmationRequiredException extends PrescriptionException {
 
-    private final List<MaxDailyDoseWarningResult> warnings;
+    private final List<MaxDailyDoseWarning> warnings;
 
-    public PrescriptionMaxDailyDoseConfirmationRequiredException(List<MaxDailyDoseWarningResult> warnings) {
+    public PrescriptionMaxDailyDoseConfirmationRequiredException(List<MaxDailyDoseWarning> warnings) {
         super(
                 DomainErrorCode.MAX_DAILY_DOSE_CONFIRMATION_REQUIRED,
                 "Tổng liều hoạt chất trong ngày vượt ngưỡng tối đa; cần xác nhận và ghi lý do."
@@ -17,7 +17,7 @@ public class PrescriptionMaxDailyDoseConfirmationRequiredException extends Presc
         this.warnings = warnings == null ? List.of() : List.copyOf(warnings);
     }
 
-    public List<MaxDailyDoseWarningResult> getWarnings() {
+    public List<MaxDailyDoseWarning> getWarnings() {
         return warnings;
     }
 }

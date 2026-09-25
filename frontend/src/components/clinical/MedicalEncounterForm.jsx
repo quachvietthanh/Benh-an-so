@@ -23,6 +23,7 @@ import {
   CheckCircleFilled,
   CheckOutlined,
   DeleteOutlined,
+  DownOutlined,
   EllipsisOutlined,
   FileSearchOutlined,
   FileTextOutlined,
@@ -32,6 +33,7 @@ import {
   PrinterOutlined,
   SearchOutlined,
   TableOutlined,
+  UpOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { getDiseaseGroupName, icd10Categories } from '../../utils/icd10Data'
@@ -117,7 +119,8 @@ function MedicalEncounterForm({
 }) {
   const [icdTableSearch, setIcdTableSearch] = useState('')
   const [icdTableCategory, setIcdTableCategory] = useState('ALL')
-  const [showIcdTable, setShowIcdTable] = useState(true)
+  const [showIcdTable, setShowIcdTable] = useState(false)
+  const [icdCardCollapsed, setIcdCardCollapsed] = useState(false)
 
   const availableIcdList = useMemo(() => {
     let list = diagnosisOptions || []
@@ -389,83 +392,112 @@ function MedicalEncounterForm({
 
           <Card
             title={
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#2563EB' }}><FileSearchOutlined /> Phân loại và mã bệnh chẩn đoán (ICD-10)</span>
-                <Button
-                  type="dashed"
-                  icon={<SearchOutlined />}
-                  size="small"
-                  onClick={() => setDiagnosisModalOpen(true)}
-                >
-                  Tra cứu mã ICD-10
-                </Button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ color: '#2563EB', fontWeight: 700 }}>
+                  <FileSearchOutlined /> Phân loại và mã bệnh chẩn đoán (ICD-10)
+                </span>
+                <Space size={8}>
+                  <Button
+                    type="dashed"
+                    icon={<SearchOutlined />}
+                    size="small"
+                    onClick={() => setDiagnosisModalOpen(true)}
+                  >
+                    Tra cứu mã ICD-10
+                  </Button>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={icdCardCollapsed ? <DownOutlined /> : <UpOutlined />}
+                    onClick={() => setIcdCardCollapsed(!icdCardCollapsed)}
+                    title={icdCardCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                  />
+                </Space>
               </div>
             }
             style={{ marginBottom: 16 }}
+            bodyStyle={{
+              padding: icdCardCollapsed ? 0 : '12px 16px',
+              display: icdCardCollapsed ? 'none' : 'block',
+            }}
             bordered
           >
-            <Form.Item label="Loại chẩn đoán y khoa">
-              <Select
-                value={diagnosisType}
-                onChange={setDiagnosisType}
-                options={[
-                  { value: 'PRELIMINARY', label: 'Chẩn đoán Sơ bộ (Lâm sàng)' },
-                  { value: 'DEFINITIVE', label: 'Chẩn đoán xác định (có cận lâm sàng)' },
-                  { value: 'DIFFERENTIAL', label: 'Chẩn đoán Phân biệt' },
-                ]}
-              />
-            </Form.Item>
-
-            <Form.Item label="Chẩn đoán chính (Mã ICD-10)" required>
-              {primaryIcd ? (
-                <div style={{ background: '#F0FDF4', padding: '12px 16px', borderRadius: 8, border: '1px solid #BBF7D0', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <Space size={8} wrap align="center">
-                      <Tag color="blue" style={{ fontSize: 13.5, fontWeight: 700, padding: '3px 8px', borderRadius: 6, margin: 0 }}>
-                        {primaryIcd.code}
-                      </Tag>
-                      <Text strong style={{ fontSize: 14, color: '#0F172A' }}>
-                        {fixMojibake(primaryIcd.name)}
-                      </Text>
-                      <Tag color={categoryMeta[primaryIcd.category]?.color || 'cyan'} style={{ fontSize: 11.5, fontWeight: 600, margin: 0 }}>
-                        Nhóm: {primaryIcd.diseaseGroup || getDiseaseGroupName(primaryIcd.code, primaryIcd.diseaseGroup)}
-                      </Tag>
-                    </Space>
-                    <Button type="text" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis} style={{ fontWeight: 600 }}>
-                      Đổi mã
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <DiagnosisCatalogAutocomplete
-                    placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh (cảm cúm, đau đầu...)"
-                    value={null}
-                    style={{ width: '100%' }}
-                    fallbackSuggestions={diagnosisOptions}
-                    onSelect={(item) => selectPrimaryDiagnosis(item)}
+            <Row gutter={[12, 10]}>
+              <Col xs={24} md={8}>
+                <Form.Item label={<span style={{ fontWeight: 600, color: '#1e293b' }}>Loại chẩn đoán y khoa</span>} style={{ marginBottom: 10 }}>
+                  <Select
+                    value={diagnosisType}
+                    onChange={setDiagnosisType}
+                    options={[
+                      { value: 'PRELIMINARY', label: 'Chẩn đoán Sơ bộ (Lâm sàng)' },
+                      { value: 'DEFINITIVE', label: 'Chẩn đoán xác định (có cận lâm sàng)' },
+                      { value: 'DIFFERENTIAL', label: 'Chẩn đoán Phân biệt' },
+                    ]}
                   />
+                </Form.Item>
+              </Col>
 
-                  <div style={{ marginTop: 10 }}>
-                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Gợi ý chẩn đoán thường gặp / Dùng gần đây:
-                    </Text>
-                    <Space wrap size={[6, 6]}>
-                      {diagnosisOptions.slice(0, 10).map((icd) => (
-                        <Tag
-                          key={icd.code}
-                          color="cyan"
-                          style={{ cursor: 'pointer', padding: '3px 8px', fontSize: 12, borderRadius: 6 }}
-                          onClick={() => selectPrimaryDiagnosis(icd)}
-                        >
-                          <b>{icd.code}</b> - {fixMojibake(icd.name)}
+              <Col xs={24} md={16}>
+                <Form.Item
+                  label={
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                      Chẩn đoán chính (Mã ICD-10) <span style={{ color: '#ef4444' }}>*</span>
+                    </span>
+                  }
+                  required={false}
+                  style={{ marginBottom: 10 }}
+                >
+                  {primaryIcd ? (
+                    <div style={{ background: '#F0FDF4', padding: '6px 12px', borderRadius: 6, border: '1px solid #BBF7D0', minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                      <Space size={6} wrap align="center">
+                        <Tag color="blue" style={{ fontSize: 13, fontWeight: 700, padding: '1px 6px', borderRadius: 4, margin: 0 }}>
+                          {primaryIcd.code}
                         </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                </div>
-              )}
-            </Form.Item>
+                        <Text strong style={{ fontSize: 13, color: '#0F172A' }}>
+                          {fixMojibake(primaryIcd.name)}
+                        </Text>
+                        <Tag color={categoryMeta[primaryIcd.category]?.color || 'cyan'} style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>
+                          Nhóm: {primaryIcd.diseaseGroup || getDiseaseGroupName(primaryIcd.code, primaryIcd.diseaseGroup)}
+                        </Tag>
+                      </Space>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis} style={{ fontWeight: 600, height: 26, padding: '0 6px' }}>
+                        Đổi mã
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <DiagnosisCatalogAutocomplete
+                        placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh..."
+                        value={null}
+                        style={{ width: '100%' }}
+                        fallbackSuggestions={diagnosisOptions}
+                        onSelect={(item) => selectPrimaryDiagnosis(item)}
+                      />
+                    </div>
+                  )}
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {!primaryIcd && (
+              <div style={{ marginTop: 0, marginBottom: 12 }}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'inline-block', marginRight: 6 }}>
+                  Gợi ý thường gặp:
+                </Text>
+                <Space wrap size={[4, 4]}>
+                  {diagnosisOptions.slice(0, 8).map((icd) => (
+                    <Tag
+                      key={icd.code}
+                      color="cyan"
+                      style={{ cursor: 'pointer', padding: '1px 6px', fontSize: 11.5, borderRadius: 4, margin: 0 }}
+                      onClick={() => selectPrimaryDiagnosis(icd)}
+                    >
+                      <b>{icd.code}</b> - {fixMojibake(icd.name).split('(')[0].trim()}
+                    </Tag>
+                  ))}
+                </Space>
+              </div>
+            )}
 
             <ComorbiditiesSection
               primaryIcd={primaryIcd}

@@ -123,6 +123,12 @@ class BackupRecordLifecycleTransactionIntegrationTest {
             public void restoreSnapshot(String fileName) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public com.benhsoan.domain.backup.BackupVerificationReport verifySnapshot(
+                    UUID backupId, String backupCode, String fileName) {
+                throw new UnsupportedOperationException();
+            }
         };
         CreateBackupService service = new CreateBackupService(
                 lifecycleService,
@@ -202,6 +208,20 @@ class BackupRecordLifecycleTransactionIntegrationTest {
         @Override
         public Optional<BackupRecord> findTopByOrderByBackupCodeDesc() {
             return Optional.empty();
+        }
+
+        @Override
+        public boolean hasActiveInProgressBackup(java.time.Instant createdAfter) {
+            return records.values().stream()
+                    .anyMatch(r -> r.getStatus() == com.benhsoan.domain.backup.enums.BackupStatus.IN_PROGRESS
+                            && r.getCreatedAt().isAfter(createdAfter));
+        }
+
+        @Override
+        public Optional<BackupRecord> findLatestByStatus(com.benhsoan.domain.backup.enums.BackupStatus status) {
+            return records.values().stream()
+                    .filter(r -> r.getStatus() == status)
+                    .max(java.util.Comparator.comparing(BackupRecord::getCreatedAt));
         }
     }
 }

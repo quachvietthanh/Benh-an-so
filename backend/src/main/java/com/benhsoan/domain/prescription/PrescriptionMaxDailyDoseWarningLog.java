@@ -46,16 +46,16 @@ public class PrescriptionMaxDailyDoseWarningLog {
             Instant handledAt,
             Instant createdAt
     ) {
-        this.id = Objects.requireNonNull(id, "Max daily dose warning log id is required.");
-        this.prescriptionId = Objects.requireNonNull(prescriptionId, "Prescription id is required.");
-        this.patientId = Objects.requireNonNull(patientId, "Patient id is required.");
+        this.id = requireNonNull(id, "Max daily dose warning log id is required.");
+        this.prescriptionId = requireNonNull(prescriptionId, "Prescription id is required.");
+        this.patientId = requireNonNull(patientId, "Patient id is required.");
         this.activeIngredient = requireText(activeIngredient, "Active ingredient is required.");
         this.totalDailyDoseMg = requirePositive(totalDailyDoseMg, "Total daily dose (mg) is required.");
         this.maxDailyDoseMg = requirePositive(maxDailyDoseMg, "Max daily dose (mg) is required.");
         this.overrideReason = normalizeOptionalText(overrideReason);
-        this.handledBy = Objects.requireNonNull(handledBy, "Handled by is required.");
-        this.handledAt = Objects.requireNonNull(handledAt, "Handled at is required.");
-        this.createdAt = Objects.requireNonNull(createdAt, "Created at is required.");
+        this.handledBy = requireNonNull(handledBy, "Handled by is required.");
+        this.handledAt = requireNonNull(handledAt, "Handled at is required.");
+        this.createdAt = requireNonNull(createdAt, "Created at is required.");
     }
 
     public static PrescriptionMaxDailyDoseWarningLog create(
@@ -111,6 +111,13 @@ public class PrescriptionMaxDailyDoseWarningLog {
 
     private static BigDecimal requirePositive(BigDecimal value, String message) {
         if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException(message);
+        }
+        return value;
+    }
+
+    private static <T> T requireNonNull(T value, String message) {
+        if (Objects.isNull(value)) {
             throw new ValidationException(message);
         }
         return value;

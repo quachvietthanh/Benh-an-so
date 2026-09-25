@@ -54,6 +54,7 @@ import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
@@ -76,6 +77,7 @@ class AmendPrescriptionServiceTest {
     @Mock private PrescriptionWarningLogRepository warningLogRepository;
     @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
     @Mock private PrescriptionMaxDailyDoseWarningLogRepository maxDailyDoseWarningLogRepository;
+    @Mock private MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository;
     @Mock private PrescriptionAmendmentRepository amendmentRepository;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private CurrentUserPort currentUserPort;
@@ -108,6 +110,7 @@ class AmendPrescriptionServiceTest {
                 warningLogRepository,
                 allergyWarningLogRepository,
                 maxDailyDoseWarningLogRepository,
+                medicineMaxDailyDoseMissingDataRepository,
                 amendmentRepository,
                 auditLogRepository,
                 currentUserPort,

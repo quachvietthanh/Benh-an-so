@@ -49,7 +49,7 @@ public class CreateBackupService implements CreateBackupUseCase {
             BackupSnapshot snapshot = snapshotExportService.export(backupCode);
             record = lifecycleService.markSuccess(record.getId(), snapshot);
         } catch (RuntimeException ex) {
-            lifecycleService.markFailed(record.getId());
+            lifecycleService.markFailed(record.getId(), ex.getMessage());
             throw new BackupExecutionException("Failed to create backup snapshot: " + ex.getMessage());
         }
 
