@@ -59,16 +59,21 @@ public class PatientPortalAppointmentController {
 
     @GetMapping
     public List<PatientAppointmentResponse> getAppointments(
-            @RequestParam(required = false) AppointmentStatus status
+            @RequestParam(required = false) AppointmentStatus status,
+            @RequestParam(required = false) UUID patientId
     ) {
-        return getPatientPortalAppointmentsUseCase.getAppointments(status).stream()
+        return getPatientPortalAppointmentsUseCase.getAppointments(status, patientId).stream()
                 .map(mapper::toResponse)
                 .toList();
     }
 
     @GetMapping("/{id}")
-    public PatientAppointmentResponse getAppointment(@PathVariable UUID id) {
-        return mapper.toResponse(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(id));
+    public PatientAppointmentResponse getAppointment(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID patientId
+    ) {
+        return mapper.toResponse(
+                getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(id, patientId));
     }
 
     @GetMapping("/available-slots")

@@ -144,7 +144,25 @@
 | `/patient-portal/invoices` | GET | ❌ | ❌ | ❌ | ❌ |
 | `/patient-portal/invoices/{id}` | GET | ❌ | ❌ | ❌ | ❌ |
 | `/patient-portal/invoices/{id}/download` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/patients/linked` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments` | POST | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments/{id}` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patients/{patientId}` | PUT | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ❌ |
 *(Lưu ý: Các endpoint `/patient-portal/**` chỉ dành riêng cho vai trò `ROLE_PATIENT` với dữ liệu thuộc chính mình theo QTN-23)*
+
+**NCL-14-CN-010 — Người giám hộ đặt lịch cho bệnh nhân phụ thuộc**
+
+| Hạng mục | Chi tiết |
+|---|---|
+| Endpoint mới | Chỉ `/patient-portal/patients/linked` (GET). Các endpoint còn lại được **mở rộng** bằng tham số tuỳ chọn `patientId`, không thay đổi phân quyền. |
+| Quyền mới | **Không có.** Không thêm permission nào. |
+| Phân quyền vận chuyển | Không đổi: `/patient-portal/**` = `hasRole("PATIENT")`; `/patients/**` = `authenticated()` + `@RequirePermission` ở tầng method. |
+| Phạm vi theo hồ sơ | `PatientAccessGuard.requirePatientAccess(...)` — hồ sơ của chính mình **hoặc** hồ sơ có `patients.guardian_user_id` = id tài khoản đang đăng nhập. |
+| Phạm vi chỉ-chính-mình (không đổi) | `/patient-portal/invoices*`, `/patient-portal/clinical-results*`, `/patient-portal/notifications*`, `/patient-portal/consent*` và `cancel` / `confirm` / `reschedule` — vẫn qua `requirePatientOwnership(...)`. |
+| Gán `guardianUserId` | Chỉ `PUT /patients/{patientId}` với `PATIENT_UPDATE`. Vai trò `PATIENT` có **0 permission grant** (`V27__seed_patient_portal_role.sql`) nên không thể tự gán người giám hộ. |
+
+Chi tiết: `docs/api/patient-portal-family-appointment-contract.md`, `docs/security-review-ncl-14-cn-010.md`.
 |  |  |  |  |  |  |
 | **Admin / System** |  |  |  |  |  |
 | `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |

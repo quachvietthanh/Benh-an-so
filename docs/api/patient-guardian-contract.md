@@ -181,3 +181,91 @@
      - `consentSignerName` (đối với người lớn): `BỆNH NHÂN #<mã_bệnh_nhân>`
    - Khi client cập nhật hồ sơ với dữ liệu đã bị mask (ví dụ `guardianName = "GIÁM HỘ #BN000001"`), hệ thống tự động nhận diện và giữ nguyên giá trị thật trong cơ sở dữ liệu, không ghi đè nhãn ẩn danh.
 
+---
+
+### 2.4. Gán tài khoản cổng bệnh nhân làm người giám hộ — `guardianUserId` (NCL-14-CN-010)
+
+Bổ sung liên kết giữa hồ sơ bệnh nhân và **tài khoản cổng bệnh nhân** của người giám hộ, phục vụ `NCL-14-CN-010` (người giám hộ đặt lịch và theo dõi lịch hẹn cho bệnh nhân phụ thuộc).
+
+#### 2.4.1. Nguồn dữ liệu duy nhất
+
+- `patients.guardian_user_id` (đã tồn tại từ `V57__add_guardian_fields_to_patients.sql`).
+- **Không** tạo bảng quan hệ giám hộ mới.
+- **Không** tạo migration mới.
+
+#### 2.4.2. Endpoint
+
+- **Method:** `PUT`
+- **Path:** `/patients/{patientId}`
+- **Permission:** `PATIENT_UPDATE` (ADMIN / DOCTOR / RECEPTIONIST)
+- **Trường mới:** `guardianUserId` (UUID, tuỳ chọn)
+
+#### 2.4.3. Quy tắc gán / giữ / xoá
+
+| # | Quy tắc | Xử lý |
+|---|---|---|
+| 1 | `guardianUserId` bỏ trống | **Giữ nguyên** giá trị đang lưu (không thể vô tình xoá liên kết giám hộ) |
+| 2 | `guardianUserId` = tài khoản cổng của chính bệnh nhân | `400 VALIDATION_FAILED` (trường `guardianUserId`) |
+| 3 | Tài khoản không tồn tại | `400 VALIDATION_FAILED` |
+| 4 | Tài khoản bị vô hiệu hoá (`active = false`) | `400 VALIDATION_FAILED` |
+| 5 | Tài khoản không thuộc vai trò `PATIENT` | `400 VALIDATION_FAILED` |
+| 6 | Tạo liên kết giám hộ vòng mức 1 (`A ↔ B`) | `400 VALIDATION_FAILED` |
+| 7 | `transitionToAdult = true` | Xoá `guardianUserId` cùng bộ ba thông tin người giám hộ |
+
+#### 2.4.4. Ví dụ
+
+**Request**
+
+```json
+{
+  "fullName": "Nguyễn Văn Con",
+  "dateOfBirth": "2015-05-10",
+  "gender": "MALE",
+  "active": true,
+  "guardianName": "Nguyễn Văn Cha",
+  "guardianRelationship": "Bo",
+  "guardianPhone": "0912345678",
+  "guardianIdentityNumber": "079090001234",
+  "guardianUserId": "a1b2c3d4-4444-4567-8901-abcdef123456"
+}
+```
+
+**Response 200 (trích)**
+
+```json
+{
+  "id": "7c1a0b88-2222-4567-8901-abcdef123456",
+  "patientCode": "BN000002",
+  "fullName": "Nguyễn Văn Con",
+  "guardianName": "Nguyễn Văn Cha",
+  "guardianUserId": "a1b2c3d4-4444-4567-8901-abcdef123456",
+  "isMinor": true,
+  "requiresAdultTransitionPrompt": false
+}
+```
+
+**Error 400 — tài khoản người giám hộ không phải vai trò bệnh nhân**
+
+```json
+{
+  "status": 400,
+  "code": "VALIDATION_FAILED",
+  "message": "guardianUserId: Tài khoản người giám hộ phải thuộc vai trò bệnh nhân (PATIENT).",
+  "path": "/patients/7c1a0b88-2222-4567-8901-abcdef123456",
+  "details": {
+    "fields": {
+      "guardianUserId": "Tài khoản người giám hộ phải thuộc vai trò bệnh nhân (PATIENT)."
+    }
+  }
+}
+```
+
+#### 2.4.5. Bảo mật
+
+- Vai trò `PATIENT` có **0 permission grant** (`V27__seed_patient_portal_role.sql`), nên tài khoản cổng bệnh nhân **không thể** tự gán chính mình hoặc người khác làm người giám hộ — đây là bảo vệ theo cấu trúc quyền, không phải theo tên trường.
+- Mọi thay đổi `guardianUserId` được ghi vào audit thay đổi hồ sơ qua `PatientChangeDetailBuilder.forUpdate`.
+- Chi tiết đánh giá: `docs/security-review-ncl-14-cn-010.md`.
+
+#### 2.4.6. Giới hạn phạm vi
+
+Đây **không phải** tính năng quản lý người giám hộ đầy đủ của `NCL-02-CN-008`. Việc gán do nhân viên thực hiện bằng quyền `PATIENT_UPDATE`; bệnh nhân **không** tự khai báo người giám hộ qua cổng, và phần thông báo chủ động của `NCL-14-CN-010-TC-03` chưa được triển khai (xem hợp đồng NCL-14-CN-010).

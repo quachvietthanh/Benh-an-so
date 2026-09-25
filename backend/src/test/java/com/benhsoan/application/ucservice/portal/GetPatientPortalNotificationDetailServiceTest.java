@@ -112,7 +112,7 @@ class GetPatientPortalNotificationDetailServiceTest {
     private PatientPortalNotification notification() {
         return PatientPortalNotification.restore(
                 NOTIFICATION_ID, PATIENT_ID, PatientPortalNotificationType.APPOINTMENT_REMINDER,
-                "SECRET_TITLE", "SECRET_MESSAGE", null, NOW, UUID.randomUUID(), null, null);
+                "SECRET_TITLE", "SECRET_MESSAGE", null, NOW, UUID.randomUUID(), null, null, null);
     }
 }
 

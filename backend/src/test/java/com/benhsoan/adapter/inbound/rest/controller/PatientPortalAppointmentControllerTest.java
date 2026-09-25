@@ -299,7 +299,7 @@ class PatientPortalAppointmentControllerTest {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
 
-        when(getPatientPortalAppointmentsUseCase.getAppointments(null))
+        when(getPatientPortalAppointmentsUseCase.getAppointments(null, null))
                 .thenReturn(List.of(new PatientAppointmentResult(
                         UUID.randomUUID(), "APT000100", patientId, doctorId,
                         Instant.parse("2099-08-10T02:00:00Z"),
@@ -322,7 +322,7 @@ class PatientPortalAppointmentControllerTest {
         UUID patientId = UUID.randomUUID();
         UUID doctorId = UUID.randomUUID();
 
-        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId))
+        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId, null))
                 .thenReturn(new PatientAppointmentResult(
                         appointmentId, "APT000100", patientId, doctorId,
                         Instant.parse("2099-08-10T02:00:00Z"),
@@ -342,7 +342,7 @@ class PatientPortalAppointmentControllerTest {
     void getAppointmentDetailReturns403ForOtherPatient() throws Exception {
         UUID appointmentId = UUID.randomUUID();
 
-        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId))
+        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId, null))
                 .thenThrow(new AccessDeniedException("Patient may only access their own data."));
 
         mockMvc.perform(get("/patient-portal/appointments/{id}", appointmentId)
@@ -402,5 +402,91 @@ class PatientPortalAppointmentControllerTest {
                 .andExpect(jsonPath("$.code").value("APPOINTMENT_PAST_CUTOFF"));
     }
 
-}
 
+    // ------------------------------------------------------------------
+    // NCL-14-CN-010: optional patientId scope on patient-portal appointments
+    // ------------------------------------------------------------------
+
+    @Test
+    void listAppointmentsForwardsPatientIdScope() throws Exception {
+        UUID patientId = UUID.randomUUID();
+
+        when(getPatientPortalAppointmentsUseCase.getAppointments(null, patientId))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/patient-portal/appointments")
+                        .param("patientId", patientId.toString())
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(getPatientPortalAppointmentsUseCase)
+                .getAppointments(null, patientId);
+    }
+
+    @Test
+    void getAppointmentDetailForwardsPatientIdScope() throws Exception {
+        UUID appointmentId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        when(getPatientPortalAppointmentDetailUseCase.getAppointmentDetail(appointmentId, patientId))
+                .thenReturn(new PatientAppointmentResult(
+                        appointmentId, "APT000300", patientId, UUID.randomUUID(),
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Kham nhi",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z")));
+
+        mockMvc.perform(get("/patient-portal/appointments/{id}", appointmentId)
+                        .param("patientId", patientId.toString())
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.patientId").value(patientId.toString()));
+    }
+
+    @Test
+    void bookAcceptsOptionalPatientId() throws Exception {
+        UUID doctorId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        when(patientBookAppointmentUseCase.book(any(PatientBookAppointmentCommand.class)))
+                .thenReturn(new PatientAppointmentResult(
+                        UUID.randomUUID(), "APT000400", dependentId, doctorId,
+                        Instant.parse("2099-08-10T02:00:00Z"),
+                        Instant.parse("2099-08-10T02:30:00Z"),
+                        AppointmentStatus.SCHEDULED,
+                        "Kham nhi",
+                        "ONLINE_PORTAL",
+                        Instant.parse("2026-08-26T02:00:00Z")));
+
+        String body = "{\"doctorId\":\"" + doctorId
+                + "\",\"appointmentDate\":\"2099-08-10\",\"startTime\":\"09:00\","
+                + "\"reason\":\"Kham nhi\",\"patientId\":\"" + dependentId + "\"}";
+
+        mockMvc.perform(post("/patient-portal/appointments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(user("patient").roles("PATIENT")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.patientId").value(dependentId.toString()));
+
+        org.mockito.ArgumentCaptor<PatientBookAppointmentCommand> captor =
+                org.mockito.ArgumentCaptor.forClass(PatientBookAppointmentCommand.class);
+        org.mockito.Mockito.verify(patientBookAppointmentUseCase).book(captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(dependentId, captor.getValue().patientId());
+    }
+
+    @Test
+    void listAppointmentsReturns401WhenUnauthenticated() throws Exception {
+        mockMvc.perform(get("/patient-portal/appointments"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listAppointmentsReturns403ForNonPatientRole() throws Exception {
+        mockMvc.perform(get("/patient-portal/appointments")
+                        .with(user("staff").roles("RECEPTIONIST")))
+                .andExpect(status().isForbidden());
+    }
+}
