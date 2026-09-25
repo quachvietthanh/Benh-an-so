@@ -9,6 +9,7 @@ import {
   DatePicker,
   Empty,
   Input,
+  Popover,
   Radio,
   Row,
   Space,
@@ -359,12 +360,31 @@ export default function VisitSummaryManagementPage() {
       width: 220,
       render: (_, record) => {
         const p = record.patient
+        const age = calculateAgeFromDob(p?.dateOfBirth)
+        const gender = p?.gender ? formatGenderVi(p?.gender) : ''
+        const validGender = gender && gender !== 'Không xác định' ? gender : ''
+
+        let patientMeta = ''
+        if (validGender && age) {
+          patientMeta = `${validGender} (${age})`
+        } else if (validGender) {
+          patientMeta = validGender
+        } else if (age) {
+          patientMeta = age
+        }
+
         return (
           <div>
             <div style={{ fontWeight: 700, color: '#0f172a' }}>{p?.fullName || '---'}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              Mã BN: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{p?.patientCode}</span> |{' '}
-              {formatGenderVi(p?.gender)} ({calculateAgeFromDob(p?.dateOfBirth)})
+              <span>Mã BN: </span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{p?.patientCode || '---'}</span>
+              {patientMeta && (
+                <>
+                  <span style={{ margin: '0 4px', color: '#94a3b8' }}>•</span>
+                  <span>{patientMeta}</span>
+                </>
+              )}
             </div>
           </div>
         )
@@ -418,22 +438,84 @@ export default function VisitSummaryManagementPage() {
     {
       title: 'Chẩn đoán chính',
       key: 'diagnosis',
-      ellipsis: true,
+      width: 140,
+      align: 'center',
       render: (_, record) => {
-        if (!record.primaryDiagnosis && !record.diagnosisCode) {
-          return <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa ghi nhận</span>
+        const hasDiagnosis = Boolean(record.primaryDiagnosis || record.diagnosisCode)
+        if (!hasDiagnosis) {
+          return <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>Chưa ghi nhận</span>
         }
+
+        const popoverContent = (
+          <div style={{ maxWidth: 360, padding: '4px 2px' }}>
+            {record.diagnosisCode && (
+              <div style={{ marginBottom: 8 }}>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  Mã ICD-10:
+                </Typography.Text>
+                <div style={{ marginTop: 2 }}>
+                  <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13 }}>
+                    {record.diagnosisCode}
+                  </Tag>
+                </div>
+              </div>
+            )}
+            <div>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Nội dung chẩn đoán chính:
+              </Typography.Text>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: 14,
+                  color: '#0f172a',
+                  marginTop: 4,
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                {record.primaryDiagnosis || record.diagnosisCode || 'Chưa ghi nhận'}
+              </div>
+            </div>
+          </div>
+        )
+
         return (
-          <Tooltip title={record.primaryDiagnosis || record.diagnosisCode}>
-            <span>
+          <Popover
+            title={
+              <Space>
+                <EyeOutlined style={{ color: '#0284c7' }} />
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>Chi tiết chẩn đoán chính</span>
+              </Space>
+            }
+            content={popoverContent}
+            trigger={['hover', 'click']}
+            placement="topLeft"
+          >
+            <Space size={6} align="middle" style={{ cursor: 'pointer', justifyContent: 'center' }}>
               {record.diagnosisCode && (
-                <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                <Tag color="geekblue" style={{ fontFamily: 'monospace', fontWeight: 600, margin: 0 }}>
                   {record.diagnosisCode}
                 </Tag>
               )}
-              <span style={{ fontWeight: 500 }}>{record.primaryDiagnosis || ''}</span>
-            </span>
-          </Tooltip>
+              <Tooltip title="Nhấn hoặc rê chuột để xem rõ hết nội dung chẩn đoán">
+                <Button
+                  type="text"
+                  icon={<EyeOutlined style={{ fontSize: 17, color: '#0284c7' }} />}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                />
+              </Tooltip>
+            </Space>
+          </Popover>
         )
       },
     },
