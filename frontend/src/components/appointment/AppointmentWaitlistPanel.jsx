@@ -295,12 +295,12 @@ export default function AppointmentWaitlistPanel({
 
   return (
     <Card style={{ borderRadius: 12 }}>
-      {/* Alert quy tắc FIFO */}
+      {/* Alert quy tắc ưu tiên */}
       <Alert
         type="info"
         showIcon
-        message="Thứ tự ưu tiên danh sách chờ (FIFO)"
-        description="Danh sách chờ được sắp xếp tự động theo nguyên tắc vào trước - ra trước (FIFO). Người ở vị trí STT #1 sẽ được hệ thống tự động gợi ý ngay khi có lịch hẹn cùng ngày của bác sĩ bị hủy."
+        message="Thứ tự ưu tiên danh sách chờ"
+        description="Bệnh nhân đăng ký trước sẽ được hệ thống tự động ưu tiên gợi ý khi có lịch hẹn cùng ngày của bác sĩ bị hủy."
         style={{ marginBottom: 16 }}
       />
 
@@ -317,7 +317,7 @@ export default function AppointmentWaitlistPanel({
                 { value: 'ALL', label: 'Tất cả Bác sĩ' },
                 ...doctorList.map((d) => ({
                   value: d.id,
-                  label: `${d.fullName || d.username} (${d.department || 'CK'})`,
+                  label: d.fullName || d.username,
                 })),
               ]}
             />

@@ -66,7 +66,7 @@ export default function WaitlistSuggestionModal({
     >
       <div style={{ marginBottom: 16 }}>
         <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          Lịch hẹn vừa bị hủy đã giải phóng khung giờ trống của bác sĩ. Dưới đây là bệnh nhân đang chờ đầu tiên theo nguyên tắc FIFO phù hợp với ngày và bác sĩ này:
+          Lịch hẹn vừa bị hủy đã giải phóng khung giờ trống của bác sĩ. Dưới đây là bệnh nhân đang chờ đầu tiên theo thứ tự đăng ký phù hợp với ngày và bác sĩ này:
         </Paragraph>
 
         <Card

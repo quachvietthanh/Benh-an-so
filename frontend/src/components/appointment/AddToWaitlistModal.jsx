@@ -135,7 +135,7 @@ export default function AddToWaitlistModal({
       <Alert
         type="info"
         showIcon
-        message="Nguyên tắc danh sách chờ (FIFO)"
+        message="Nguyên tắc danh sách chờ"
         description="Khi bác sĩ đã kín lịch vào ngày mong muốn, hệ thống sẽ lưu bệnh nhân vào danh sách chờ. Khi có bất kỳ lịch hẹn nào bị hủy, hệ thống sẽ tự động gợi ý bệnh nhân nộp đơn sớm nhất để lấp chỗ trống."
         style={{ marginBottom: 16 }}
       />
