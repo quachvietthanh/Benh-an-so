@@ -100,4 +100,10 @@ public class MedicalRecordEntity {
 
     @Column(name = "template_applied_at")
     private Instant templateAppliedAt;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    @Column(name = "archived_by")
+    private UUID archivedBy;
 }

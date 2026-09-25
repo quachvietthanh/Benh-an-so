@@ -36,7 +36,9 @@ public class MedicalRecordPersistenceMapper {
                 entity.getUpdatedAt(),
                 entity.getAppliedTemplateVersionId(),
                 entity.getTemplateAppliedBy(),
-                entity.getTemplateAppliedAt()
+                entity.getTemplateAppliedAt(),
+                entity.getArchivedAt(),
+                entity.getArchivedBy()
         );
     }
 
@@ -55,6 +57,8 @@ public class MedicalRecordPersistenceMapper {
                 .updatedBy(domain.getUpdatedBy()).updatedAt(domain.getUpdatedAt())
                 .appliedTemplateVersionId(domain.getAppliedTemplateVersionId())
                 .templateAppliedBy(domain.getTemplateAppliedBy()).templateAppliedAt(domain.getTemplateAppliedAt())
+                .archivedAt(domain.getArchivedAt())
+                .archivedBy(domain.getArchivedBy())
                 .build();
     }
 }

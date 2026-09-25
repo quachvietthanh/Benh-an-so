@@ -1,5 +1,5 @@
 -- =====================================================
--- V87__create_backup_schedule_configuration_table.sql
+-- V96__create_backup_schedule_configuration_table.sql
 -- NCL-09-CN-009: Sao lưu tự động theo lịch và kiểm tra bản sao lưu
 -- =====================================================
 

@@ -10,6 +10,7 @@ public record ClinicConfigurationResponse(
         LocalTime closingTime,
         Integer retentionYears,
         Integer signingDeadlineHours,
+        Integer activeRecordDurationMonths,
         Integer sessionIdleTimeoutMinutes
 ) {
 }

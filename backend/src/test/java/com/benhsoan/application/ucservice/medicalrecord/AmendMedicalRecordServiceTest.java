@@ -3,6 +3,8 @@ package com.benhsoan.application.ucservice.medicalrecord;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -104,13 +106,17 @@ class AmendMedicalRecordServiceTest {
     void rejectsAmendmentForArchivedRecord() {
         UUID recordId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(medicalRecordRepository.findById(recordId))
-                .thenReturn(Optional.of(record(recordId, UUID.randomUUID(), userId, MedicalRecordStatus.ARCHIVED)));
+        MedicalRecord record = record(recordId, UUID.randomUUID(), userId, MedicalRecordStatus.ARCHIVED);
+        when(medicalRecordRepository.findById(recordId)).thenReturn(Optional.of(record));
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        doThrow(new com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException())
+                .when(authorizationService).ensureNotArchived(eq(record), eq(userId), any());
 
-        assertThrows(MedicalRecordNotLockedException.class,
+        assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException.class,
                 () -> service.amend(recordId, new AmendMedicalRecordCommand("Correction", "Clarification")));
 
-        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter, authorizationService);
+        verify(authorizationService).ensureNotArchived(eq(record), eq(userId), any());
+        verifyNoInteractions(amendmentRepository, accessAuditService, amendmentAuditWriter);
     }
 
     @Test

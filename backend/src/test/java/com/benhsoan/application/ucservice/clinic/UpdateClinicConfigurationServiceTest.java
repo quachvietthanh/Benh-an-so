@@ -96,7 +96,8 @@ class UpdateClinicConfigurationServiceTest {
         assertEquals(ActionType.UPDATE, audit.getActionType());
         assertEquals(ResourceType.CONFIGURATION, audit.getResourceType());
         assertEquals(ACTOR, audit.getUserId());
-        assertTrue(audit.getDetail().contains("10 to 15"), audit.getDetail());
+        assertTrue(audit.getDetail().contains("\"retentionYears\":10"), audit.getDetail());
+        assertTrue(audit.getDetail().contains("\"retentionYears\":15"), audit.getDetail());
     }
 
     @Test

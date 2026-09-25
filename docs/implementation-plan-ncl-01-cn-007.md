@@ -303,7 +303,7 @@ Sắp xếp theo thứ tự phụ thuộc kiến trúc:
 ## 5. Kế hoạch Rollout, Kiểm chứng & Tiêu chuẩn Nghiệm thu
 
 ### 5.1. Thứ tự Deploy An toàn (Safe Rollout Sequence)
-1. **Kiểm tra Migration Flyway:** Chạy migration `V90__session_management_and_idle_timeout.sql` trên môi trường Staging/Test DB.
+1. **Kiểm tra Migration Flyway:** Chạy migration `V97__session_management_and_idle_timeout.sql` trên môi trường Staging/Test DB.
    - Xác nhận bảng `clinic_configuration` có cột `session_idle_timeout_minutes` với giá trị mặc định 30.
    - Xác nhận bảng `user_sessions` có cột `ip_address`, `user_agent` và index `idx_user_sessions_active`.
    - Xác nhận bảng `permissions` có 2 quyền `SESSION_READ`, `SESSION_TERMINATE` và đã gán cho `ROLE_ADMIN`.

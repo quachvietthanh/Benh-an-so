@@ -1,5 +1,5 @@
 -- =====================================================
--- V90 - Grant medical record export permission (NCL-11-CN-007).
+-- V98 - Grant medical record export permission (NCL-11-CN-007).
 -- ADMIN / MANAGER export medical records according to data exchange structure.
 -- =====================================================
 

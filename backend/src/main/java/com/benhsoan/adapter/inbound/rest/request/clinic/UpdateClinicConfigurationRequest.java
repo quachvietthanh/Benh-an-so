@@ -31,6 +31,9 @@ public record UpdateClinicConfigurationRequest(
         @Min(value = 1, message = "Signing deadline hours must be at least 1.")
         Integer signingDeadlineHours,
 
+        @Min(value = 1, message = "Active record duration months must be at least 1.")
+        Integer activeRecordDurationMonths,
+
         @Min(value = 5, message = "Session idle timeout must be at least 5 minutes.")
         @Max(value = 1440, message = "Session idle timeout must not exceed 1440 minutes.")
         Integer sessionIdleTimeoutMinutes

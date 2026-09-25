@@ -53,6 +53,13 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 ? command.signingDeadlineHours()
                 : beforeSigningDeadlineHours;
 
+        int beforeActiveRecordDurationMonths = clinicConfigurationRepository.find()
+                .map(ClinicConfiguration::getActiveRecordDurationMonths)
+                .orElse(ClinicConfiguration.DEFAULT_ACTIVE_RECORD_DURATION_MONTHS);
+        int afterActiveRecordDurationMonths = command.activeRecordDurationMonths() != null
+                ? command.activeRecordDurationMonths()
+                : beforeActiveRecordDurationMonths;
+
         int beforeSessionIdleTimeoutMinutes = clinicConfigurationRepository.find()
                 .map(ClinicConfiguration::getSessionIdleTimeoutMinutes)
                 .orElse(ClinicConfiguration.DEFAULT_SESSION_IDLE_TIMEOUT_MINUTES);
@@ -61,7 +68,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 : beforeSessionIdleTimeoutMinutes;
 
         ClinicConfiguration configuration = clinicConfigurationRepository.find()
-                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, afterSessionIdleTimeoutMinutes, now))
+                .map(existing -> update(existing, command, afterRetentionYears, afterSigningDeadlineHours, afterActiveRecordDurationMonths, afterSessionIdleTimeoutMinutes, now))
                 .orElseGet(() -> ClinicConfiguration.create(
                         command.clinicName(),
                         command.address(),
@@ -70,6 +77,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                         command.closingTime(),
                         afterRetentionYears,
                         afterSigningDeadlineHours,
+                        afterActiveRecordDurationMonths,
                         afterSessionIdleTimeoutMinutes,
                         now
                 ));
@@ -77,6 +85,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
         ClinicConfiguration saved = clinicConfigurationRepository.save(configuration);
         auditConfigurationUpdate(beforeRetentionYears, saved.getRetentionYears(),
                 beforeSigningDeadlineHours, saved.getSigningDeadlineHours(),
+                beforeActiveRecordDurationMonths, saved.getActiveRecordDurationMonths(),
                 beforeSessionIdleTimeoutMinutes, saved.getSessionIdleTimeoutMinutes(), now);
 
         return resultMapper.toResult(saved);
@@ -87,6 +96,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
             UpdateClinicConfigurationCommand command,
             int retentionYears,
             int signingDeadlineHours,
+            int activeRecordDurationMonths,
             int sessionIdleTimeoutMinutes,
             Instant updatedAt
     ) {
@@ -98,6 +108,7 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
                 command.closingTime(),
                 retentionYears,
                 signingDeadlineHours,
+                activeRecordDurationMonths,
                 sessionIdleTimeoutMinutes,
                 updatedAt
         );
@@ -107,17 +118,19 @@ public class UpdateClinicConfigurationService implements UpdateClinicConfigurati
     private void auditConfigurationUpdate(
             int beforeRetentionYears, int afterRetentionYears,
             int beforeSigningDeadlineHours, int afterSigningDeadlineHours,
+            int beforeActiveDuration, int afterActiveDuration,
             int beforeSessionIdleTimeoutMinutes, int afterSessionIdleTimeoutMinutes,
             Instant now
     ) {
         UUID actorId = currentUserPort.getCurrentUserId();
         String detail = """
-                {"before":{"retentionYears":%d,"signingDeadlineHours":%d,"sessionIdleTimeoutMinutes":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d,"sessionIdleTimeoutMinutes":%d},"summary":"Clinic configuration updated; retentionYears changed from %d to %d; signingDeadlineHours changed from %d to %d; sessionIdleTimeoutMinutes changed from %d to %d"}
+                {"before":{"retentionYears":%d,"signingDeadlineHours":%d,"activeRecordDurationMonths":%d,"sessionIdleTimeoutMinutes":%d},"after":{"retentionYears":%d,"signingDeadlineHours":%d,"activeRecordDurationMonths":%d,"sessionIdleTimeoutMinutes":%d},"summary":"Clinic configuration updated; retentionYears changed from %d to %d; signingDeadlineHours changed from %d to %d; activeRecordDurationMonths changed from %d to %d; sessionIdleTimeoutMinutes changed from %d to %d"}
                 """.formatted(
-                beforeRetentionYears, beforeSigningDeadlineHours, beforeSessionIdleTimeoutMinutes,
-                afterRetentionYears, afterSigningDeadlineHours, afterSessionIdleTimeoutMinutes,
+                beforeRetentionYears, beforeSigningDeadlineHours, beforeActiveDuration, beforeSessionIdleTimeoutMinutes,
+                afterRetentionYears, afterSigningDeadlineHours, afterActiveDuration, afterSessionIdleTimeoutMinutes,
                 beforeRetentionYears, afterRetentionYears,
                 beforeSigningDeadlineHours, afterSigningDeadlineHours,
+                beforeActiveDuration, afterActiveDuration,
                 beforeSessionIdleTimeoutMinutes, afterSessionIdleTimeoutMinutes
         ).trim();
 

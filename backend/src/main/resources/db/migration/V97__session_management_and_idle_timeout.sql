@@ -1,5 +1,5 @@
 -- =====================================================
--- V90__session_management_and_idle_timeout.sql
+-- V97__session_management_and_idle_timeout.sql
 -- NCL-01-CN-007: Quản lý phiên làm việc và tự động đăng xuất (QTN-45, QTN-01)
 -- 1. Add session_idle_timeout_minutes to clinic_configuration
 -- 2. Add ip_address and user_agent to user_sessions

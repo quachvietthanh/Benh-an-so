@@ -161,6 +161,8 @@ final class DomainExceptionHttpStatusMapper {
                     MEDICAL_RECORD_INVALID_STATUS,
                     MEDICAL_RECORD_INVALID_VISIT,
                     MEDICAL_RECORD_IN_RETENTION_PERIOD,
+                    MEDICAL_RECORD_ARCHIVED_READ_ONLY,
+                    MEDICAL_RECORD_NOT_ELIGIBLE_FOR_ARCHIVE,
                     PATIENT_ALREADY_IN_WAITLIST,
                     MEDICAL_RECORD_LOCKED,
                     MEDICAL_RECORD_TEMPLATE_CHANGE_WITH_CONTENT,
