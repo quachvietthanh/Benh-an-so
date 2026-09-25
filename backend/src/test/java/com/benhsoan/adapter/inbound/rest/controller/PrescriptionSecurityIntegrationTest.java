@@ -34,6 +34,7 @@ import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
+import com.benhsoan.port.inbound.prescription.CheckMaxDailyDoseUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
@@ -88,6 +89,7 @@ class PrescriptionSecurityIntegrationTest {
     @MockitoBean private CheckDrugInteractionUseCase checkDrugInteractionUseCase;
     @MockitoBean private CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
     @MockitoBean private CheckContraindicationUseCase checkContraindicationUseCase;
+    @MockitoBean private CheckMaxDailyDoseUseCase checkMaxDailyDoseUseCase;
     @MockitoBean private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
     @MockitoBean private ExportPrescriptionUseCase exportPrescriptionUseCase;
     @MockitoBean private SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;

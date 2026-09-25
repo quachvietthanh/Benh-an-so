@@ -44,6 +44,7 @@ import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.outbound.generator.PrescriptionCodeGenerator;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
@@ -65,6 +66,7 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionContraindi
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionMaxDailyDoseWarningLogRepository;
 import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 import com.benhsoan.domain.prescription.PrescriptionMaxDailyDoseWarningLog;
+import com.benhsoan.domain.medicine.MedicineMaxDailyDoseMissingData;
 import com.benhsoan.domain.prescription.exception.PrescriptionMaxDailyDoseConfirmationRequiredException;
 import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import java.math.BigDecimal;
@@ -84,6 +86,7 @@ class CreatePrescriptionServiceTest {
     @Mock private PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
     @Mock private PrescriptionContraindicationWarningLogRepository contraindicationWarningLogRepository;
     @Mock private PrescriptionMaxDailyDoseWarningLogRepository maxDailyDoseWarningLogRepository;
+    @Mock private MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository;
     @Mock private PrescriptionCodeGenerator prescriptionCodeGenerator;
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
@@ -121,6 +124,7 @@ class CreatePrescriptionServiceTest {
                 allergyWarningLogRepository,
                 contraindicationWarningLogRepository,
                 maxDailyDoseWarningLogRepository,
+                medicineMaxDailyDoseMissingDataRepository,
                 prescriptionCodeGenerator,
                 currentUserPort,
                 new PrescriptionResultMapper(displayContextResolver),
@@ -621,6 +625,62 @@ class CreatePrescriptionServiceTest {
         assertEquals("RX000001", result.prescriptionCode());
         assertEquals(1, result.maxDailyDoseMissingData().size());
         verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void missingMaxDailyDoseConfig_isRecordedButDoesNotBlock() {
+        prepareValidCreate();
+        preparePersistence();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(
+                configuredMedicine(medicineId, new BigDecimal("500"), null)));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.create(command(List.of(item(medicineId)), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(medicineMaxDailyDoseMissingDataRepository).record(
+                medicineId,
+                "Paracetamol",
+                MedicineMaxDailyDoseMissingData.REASON_MAX_DAILY_DOSE,
+                NOW);
+        verify(maxDailyDoseWarningLogRepository, never()).save(any());
+    }
+
+    @Test
+    void missingStrengthConfig_isRecordedButDoesNotBlock() {
+        prepareValidCreate();
+        preparePersistence();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(
+                configuredMedicine(medicineId, null, new BigDecimal("2000"))));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        var result = service.create(command(List.of(item(medicineId)), List.of()));
+
+        assertEquals("RX000001", result.prescriptionCode());
+        verify(medicineMaxDailyDoseMissingDataRepository).record(
+                medicineId,
+                "Paracetamol",
+                MedicineMaxDailyDoseMissingData.REASON_STRENGTH_VALUE,
+                NOW);
+    }
+
+    @Test
+    void configuredMedicine_doesNotRecordMissingData() {
+        prepareValidCreate();
+        preparePersistence();
+        when(medicineRepository.findAllById(any())).thenReturn(List.of(dosedMedicine(medicineId)));
+        when(checkDrugInteractionUseCase.check(any())).thenReturn(List.of());
+
+        service.create(command(List.of(item(medicineId)), List.of()));
+
+        verify(medicineMaxDailyDoseMissingDataRepository, never())
+                .record(any(), any(), any(), any());
+    }
+
+    private Medicine configuredMedicine(UUID id, BigDecimal strengthValueMg, BigDecimal maxDailyDoseMg) {
+        return Medicine.restore(id, "MED001", "Paracetamol", "Paracetamol", "500 mg", DosageForm.TABLET,
+                "tablet", AdministrationRoute.ORAL, true, NOW, null, 0, 20, false,
+                strengthValueMg, maxDailyDoseMg);
     }
 
     private Medicine dosedMedicine(UUID id) {

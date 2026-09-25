@@ -29,6 +29,7 @@ import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.medicine.CreateMedicineCommand;
 import com.benhsoan.port.dto.command.medicine.SearchMedicinesQuery;
 import com.benhsoan.port.dto.command.medicine.UpdateMedicineCommand;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -38,6 +39,8 @@ class MedicineApplicationServiceTest {
     private static final Instant NOW = Instant.parse("2026-08-06T02:00:00Z");
 
     private final MedicineRepository medicineRepository = mock(MedicineRepository.class);
+    private final MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository =
+            mock(MedicineMaxDailyDoseMissingDataRepository.class);
     private final CurrentUserPort currentUserPort = mock(CurrentUserPort.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final MedicineManagementAuthorizer authorizer =
@@ -237,6 +240,7 @@ class MedicineApplicationServiceTest {
         )).thenReturn(true);
         UpdateMedicineService service = new UpdateMedicineService(
                 medicineRepository,
+                medicineMaxDailyDoseMissingDataRepository,
                 authorizer,
                 resultMapper,
                 clockPort,

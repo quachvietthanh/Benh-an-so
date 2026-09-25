@@ -5,11 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
-import com.benhsoan.port.dto.result.MaxDailyDoseCheckResult;
-import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
-import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
+import java.util.TreeSet;
 
 /**
  * NCL-05-CN-007: pure calculation of total daily active-ingredient dose.
@@ -22,6 +18,9 @@ import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
  * daily dose is usable only when every dose-carrying row agrees on a single
  * non-null value. Null/inconsistent configuration is reported as missing data and
  * never blocks the prescription (TC-04).
+ *
+ * <p>This class is framework-, DTO-, persistence- and HTTP-independent and returns
+ * only domain-owned result types.
  */
 public final class MaxDailyDoseCalculator {
 
@@ -37,9 +36,9 @@ public final class MaxDailyDoseCalculator {
     ) {
     }
 
-    public static MaxDailyDoseCheckResult evaluate(List<Item> items) {
+    public static MaxDailyDoseEvaluationResult evaluate(List<Item> items) {
         if (items == null || items.isEmpty()) {
-            return new MaxDailyDoseCheckResult(List.of(), List.of());
+            return new MaxDailyDoseEvaluationResult(List.of(), List.of());
         }
 
         // Group by normalized active ingredient name while preserving insertion order.
@@ -49,8 +48,8 @@ public final class MaxDailyDoseCalculator {
             byIngredient.computeIfAbsent(key, ignored -> new ArrayList<>()).add(item);
         }
 
-        List<MaxDailyDoseWarningResult> warnings = new ArrayList<>();
-        List<MaxDailyDoseMissingDataResult> missingData = new ArrayList<>();
+        List<MaxDailyDoseWarning> warnings = new ArrayList<>();
+        List<MaxDailyDoseMissingData> missingData = new ArrayList<>();
 
         for (Map.Entry<String, List<Item>> entry : byIngredient.entrySet()) {
             String ingredient = entry.getValue().getFirst().activeIngredient();
@@ -59,7 +58,7 @@ public final class MaxDailyDoseCalculator {
             // Resolve the active-ingredient level maxDailyDoseMg deterministically.
             BigDecimal maxDose = resolveMaxDailyDose(group);
             if (maxDose == null) {
-                missingData.add(new MaxDailyDoseMissingDataResult(
+                missingData.add(new MaxDailyDoseMissingData(
                         ingredient,
                         "Thiếu hoặc không nhất quán cấu hình liều tối đa theo ngày cho hoạt chất."
                 ));
@@ -82,7 +81,7 @@ public final class MaxDailyDoseCalculator {
             }
 
             if (incomplete) {
-                missingData.add(new MaxDailyDoseMissingDataResult(
+                missingData.add(new MaxDailyDoseMissingData(
                         ingredient,
                         "Thiếu dữ liệu liều (hàm lượng mg, số lượng mỗi lần hoặc số lần/ngày) cho hoạt chất."
                 ));
@@ -90,11 +89,11 @@ public final class MaxDailyDoseCalculator {
             }
 
             if (total.compareTo(maxDose) > 0) {
-                warnings.add(new MaxDailyDoseWarningResult(ingredient, total, maxDose));
+                warnings.add(new MaxDailyDoseWarning(ingredient, total, maxDose));
             }
         }
 
-        return new MaxDailyDoseCheckResult(List.copyOf(warnings), List.copyOf(missingData));
+        return new MaxDailyDoseEvaluationResult(List.copyOf(warnings), List.copyOf(missingData));
     }
 
     /**
@@ -102,9 +101,12 @@ public final class MaxDailyDoseCalculator {
      * the group has no value (unconfigured), has mixed null/non-null values (incomplete),
      * or has conflicting non-null values (configuration conflict). Null is never treated
      * as zero or unlimited; it is reported as missing data.
+     *
+     * <p>Distinct values are compared numerically ({@code BigDecimal.compareTo}), so
+     * {@code 2000.000} and {@code 2000} are the same configuration rather than a conflict.
      */
     private static BigDecimal resolveMaxDailyDose(List<Item> group) {
-        Set<BigDecimal> distinct = new java.util.LinkedHashSet<>();
+        TreeSet<BigDecimal> distinct = new TreeSet<>(BigDecimal::compareTo);
         boolean sawNull = false;
         for (Item item : group) {
             if (item.maxDailyDoseMg() == null) {
@@ -115,7 +117,7 @@ public final class MaxDailyDoseCalculator {
         }
 
         if (distinct.size() == 1 && !sawNull) {
-            return distinct.iterator().next();
+            return distinct.first();
         }
         // 0 values, mixed null/non-null, or >1 distinct non-null values → missing data.
         return null;

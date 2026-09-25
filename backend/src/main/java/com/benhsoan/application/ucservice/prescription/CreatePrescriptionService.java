@@ -18,6 +18,7 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicine.Medicine;
+import com.benhsoan.domain.medicine.MedicineMaxDailyDoseMissingData;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
@@ -25,6 +26,9 @@ import com.benhsoan.domain.prescription.enums.WarningAction;
 import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
 import com.benhsoan.domain.prescription.PrescriptionContraindicationWarningLog;
 import com.benhsoan.domain.prescription.MaxDailyDoseCalculator;
+import com.benhsoan.domain.prescription.MaxDailyDoseEvaluationResult;
+import com.benhsoan.domain.prescription.MaxDailyDoseMissingData;
+import com.benhsoan.domain.prescription.MaxDailyDoseWarning;
 import com.benhsoan.domain.prescription.PrescriptionMaxDailyDoseWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionContraindicationConfirmationRequiredException;
@@ -45,8 +49,7 @@ import com.benhsoan.port.dto.result.ContraindicationCheckResult;
 import com.benhsoan.port.dto.result.ContraindicationWarningResult;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
-import com.benhsoan.port.dto.result.MaxDailyDoseCheckResult;
-import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
@@ -59,6 +62,7 @@ import com.benhsoan.port.outbound.repository.prescription.PrescriptionContraindi
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionMaxDailyDoseWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.repository.medicalrecord.MedicalRecordDiagnosisRepository;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -91,6 +95,8 @@ public class CreatePrescriptionService
     private final PrescriptionContraindicationWarningLogRepository contraindicationWarningLogRepository;
 
     private final PrescriptionMaxDailyDoseWarningLogRepository maxDailyDoseWarningLogRepository;
+
+    private final MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository;
 
     private final PrescriptionCodeGenerator prescriptionCodeGenerator;
 
@@ -167,7 +173,7 @@ public class CreatePrescriptionService
         // NCL-05-CN-007: total daily active-ingredient dose check (mg/day). Missing
         // configuration is reported as missing data (never zero, never a block);
         // exceedances must be confirmed with an override reason.
-        MaxDailyDoseCheckResult maxDoseCheck = MaxDailyDoseCalculator.evaluate(
+        MaxDailyDoseEvaluationResult maxDoseCheck = MaxDailyDoseCalculator.evaluate(
                 itemCommands.stream()
                         .map(cmd -> toDoseItem(cmd, medicines.get(cmd.medicineId())))
                         .toList()
@@ -176,6 +182,11 @@ public class CreatePrescriptionService
                 maxDoseCheck.warnings(),
                 command.maxDailyDoseOverrides()
         );
+
+        // Resolve the display context once so the save flow and the result mapping do
+        // not trigger duplicate database lookups.
+        PrescriptionDisplayContextResolver.PrescriptionDisplayContext displayContext =
+                displayContextResolver.resolve(command.medicalRecordId(), currentUserId);
 
         Prescription prescription = Prescription.create(
                 prescriptionId,
@@ -213,12 +224,14 @@ public class CreatePrescriptionService
 
         saveMaxDailyDoseWarningLogs(
                 saved.getId(),
-                displayContextResolver.resolve(command.medicalRecordId(), currentUserId).patientId(),
+                displayContext.patientId(),
                 maxDoseCheck.warnings(),
                 maxDoseOverrideReasons,
                 currentUserId,
                 now
         );
+
+        recordMissingMaxDailyDoseData(medicines, now);
 
         saveAuditLog(saved,
                 warningLogs.size()
@@ -228,7 +241,12 @@ public class CreatePrescriptionService
                 currentUserId,
                 now);
 
-        return resultMapper.toResult(saved, warningLogs, maxDoseCheck.missingData());
+        return resultMapper.toResult(
+                saved,
+                warningLogs,
+                toMissingDataResults(maxDoseCheck.missingData()),
+                displayContext
+        );
     }
 
     private void authorizeDoctor() {
@@ -674,7 +692,7 @@ public class CreatePrescriptionService
     }
 
     private Map<String, String> validateMaxDailyDoseOverrides(
-            List<MaxDailyDoseWarningResult> warnings,
+            List<MaxDailyDoseWarning> warnings,
             List<PrescriptionMaxDailyDoseOverrideCommand> overrides
     ) {
         List<PrescriptionMaxDailyDoseOverrideCommand> cleanOverrides =
@@ -723,12 +741,12 @@ public class CreatePrescriptionService
     private void saveMaxDailyDoseWarningLogs(
             UUID prescriptionId,
             UUID patientId,
-            List<MaxDailyDoseWarningResult> warnings,
+            List<MaxDailyDoseWarning> warnings,
             Map<String, String> overrideReasons,
             UUID handledBy,
             Instant handledAt
     ) {
-        for (MaxDailyDoseWarningResult warning : warnings) {
+        for (MaxDailyDoseWarning warning : warnings) {
             maxDailyDoseWarningLogRepository.save(PrescriptionMaxDailyDoseWarningLog.create(
                     UUID.randomUUID(),
                     prescriptionId,
@@ -741,6 +759,41 @@ public class CreatePrescriptionService
                     handledAt
             ));
         }
+    }
+
+    private void recordMissingMaxDailyDoseData(
+            Map<UUID, Medicine> medicines,
+            Instant detectedAt
+    ) {
+        for (Medicine medicine : medicines.values()) {
+            if (medicine.getMaxDailyDoseMg() == null) {
+                medicineMaxDailyDoseMissingDataRepository.record(
+                        medicine.getId(),
+                        medicine.getActiveIngredient(),
+                        MedicineMaxDailyDoseMissingData.REASON_MAX_DAILY_DOSE,
+                        detectedAt
+                );
+            }
+            if (medicine.getStrengthValueMg() == null) {
+                medicineMaxDailyDoseMissingDataRepository.record(
+                        medicine.getId(),
+                        medicine.getActiveIngredient(),
+                        MedicineMaxDailyDoseMissingData.REASON_STRENGTH_VALUE,
+                        detectedAt
+                );
+            }
+        }
+    }
+
+    private List<MaxDailyDoseMissingDataResult> toMissingDataResults(
+            List<MaxDailyDoseMissingData> missingData
+    ) {
+        return missingData.stream()
+                .map(data -> new MaxDailyDoseMissingDataResult(
+                        data.activeIngredient(),
+                        data.reason()
+                ))
+                .toList();
     }
 
     private static String normalizeIngredient(String activeIngredient) {

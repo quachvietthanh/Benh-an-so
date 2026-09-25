@@ -9,10 +9,12 @@ import com.benhsoan.application.ucservice.auditlog.AdminOperationAuditService;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicine.Medicine;
+import com.benhsoan.domain.medicine.MedicineMaxDailyDoseMissingData;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.medicine.UpdateMedicineCommand;
 import com.benhsoan.port.dto.result.MedicineResult;
 import com.benhsoan.port.inbound.medicine.UpdateMedicineUseCase;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
@@ -25,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 public class UpdateMedicineService implements UpdateMedicineUseCase {
 
     private final MedicineRepository medicineRepository;
+
+    private final MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository;
 
     private final MedicineManagementAuthorizer authorizer;
 
@@ -74,6 +78,9 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
         validateUniqueness(medicine);
 
         Medicine saved = medicineRepository.save(medicine);
+
+        clearResolvedMissingMaxDailyDoseData(saved);
+
         adminOperationAuditService.record(
                 currentUserPort.getCurrentUserId(),
                 ActionType.UPDATE,
@@ -105,6 +112,21 @@ public class UpdateMedicineService implements UpdateMedicineUseCase {
         )) {
             throw new ValidationException(
                     "Medicine name and active ingredient already exist."
+            );
+        }
+    }
+
+    private void clearResolvedMissingMaxDailyDoseData(Medicine saved) {
+        if (saved.getMaxDailyDoseMg() != null) {
+            medicineMaxDailyDoseMissingDataRepository.clear(
+                    saved.getId(),
+                    MedicineMaxDailyDoseMissingData.REASON_MAX_DAILY_DOSE
+            );
+        }
+        if (saved.getStrengthValueMg() != null) {
+            medicineMaxDailyDoseMissingDataRepository.clear(
+                    saved.getId(),
+                    MedicineMaxDailyDoseMissingData.REASON_STRENGTH_VALUE
             );
         }
     }
