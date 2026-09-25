@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.benhsoan.domain.prescription.enums.PrescriptionStatus;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
@@ -28,9 +29,22 @@ public class GetPrescriptionService implements GetPrescriptionUseCase {
         var prescription = prescriptionRepository.findById(prescriptionId)
                 .orElseThrow(() -> new PrescriptionNotFoundException(prescriptionId));
         accessValidator.requireCanRead(prescription);
-        return resultMapper.toResult(
+        PrescriptionResult result = resultMapper.toResult(
                 prescription,
                 warningLogRepository.findByPrescriptionId(prescriptionId)
         );
+
+        // A superseded original also exposes the replacement that succeeded it.
+        if (result.status() != PrescriptionStatus.REPLACED) {
+            return result;
+        }
+        return prescriptionRepository.findReplacementOf(prescriptionId)
+                .map(replacement -> result.withReplacementLink(
+                        result.replacesPrescriptionId(),
+                        result.replacesPrescriptionCode(),
+                        result.replacementReason(),
+                        replacement.getId(),
+                        replacement.getPrescriptionCode()))
+                .orElse(result);
     }
 }
