@@ -98,4 +98,21 @@ class DeleteMedicalRecordServiceTest {
         verify(medicalRecordRepository).deleteById(RECORD_ID);
         verify(auditWriter).writeDeleted(ACTOR, RECORD_ID, NOW);
     }
+
+    @Test
+    void blocksDeletionWhenRecordIsArchivedAndWritesDenialAudit() {
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(ACTOR);
+
+        MedicalRecord archivedRecord = MedicalRecord.restore(RECORD_ID, VISIT_ID, "c", "s", "h", "p", "cp", "tp", "di", "co",
+                MedicalRecordStatus.ARCHIVED, NOW, DOCTOR_ID, DOCTOR_ID, NOW, null, null);
+
+        when(medicalRecordRepository.findById(RECORD_ID)).thenReturn(Optional.of(archivedRecord));
+
+        assertThrows(com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException.class,
+                () -> service().delete(RECORD_ID));
+
+        verify(medicalRecordRepository, never()).deleteById(RECORD_ID);
+        verify(auditWriter).writeDenied(ACTOR, RECORD_ID, NOW);
+    }
 }

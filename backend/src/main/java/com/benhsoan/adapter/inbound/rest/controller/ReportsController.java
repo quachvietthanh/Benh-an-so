@@ -161,16 +161,30 @@ public class ReportsController {
             @RequestParam String reportType,
             @RequestParam String from,
             @RequestParam String to,
-            @RequestParam(required = false) UUID doctorId
+            @RequestParam(required = false) UUID doctorId,
+            @RequestParam(required = false, defaultValue = "false") boolean unmask,
+            @RequestParam(required = false) String reason
     ) {
         ReportType selectedReportType = parseReportType(reportType);
         LocalDate fromDate = parseDate(from, "from");
         LocalDate toDate = parseDate(to, "to");
         validateRange(fromDate, toDate);
 
-        OperationalReportExportResult exportResult = doctorId == null
-                ? exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate)
-                : exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate, doctorId);
+        OperationalReportExportResult exportResult;
+        if (!unmask && reason == null) {
+            exportResult = doctorId == null
+                    ? exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate)
+                    : exportOperationalReportUseCase.export(selectedReportType, fromDate, toDate, doctorId);
+        } else {
+            exportResult = exportOperationalReportUseCase.export(
+                    selectedReportType,
+                    fromDate,
+                    toDate,
+                    doctorId,
+                    unmask,
+                    reason
+            );
+        }
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exportResult.fileName() + "\"")

@@ -87,4 +87,47 @@ public class QueueRestMapper {
                 result.reason(),
                 result.timestamp());
     }
+
+    public com.benhsoan.adapter.inbound.rest.response.queue.WaitingRoomBoardResponse toResponse(
+            com.benhsoan.port.dto.result.WaitingRoomBoardResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.queue.WaitingRoomBoardResponse(
+                result.date(),
+                result.updatedAt(),
+                result.rooms().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.queue.RoomQueueDisplayResponse toResponse(
+            com.benhsoan.port.dto.result.RoomQueueDisplayResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.queue.RoomQueueDisplayResponse(
+                result.roomId(),
+                result.roomNumber(),
+                result.roomName(),
+                result.doctorId(),
+                result.doctorName(),
+                toResponse(result.currentCalling()),
+                result.waitingList().stream().map(this::toResponse).toList()
+        );
+    }
+
+    public com.benhsoan.adapter.inbound.rest.response.queue.QueueDisplayItemResponse toResponse(
+            com.benhsoan.port.dto.result.QueueDisplayItemResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new com.benhsoan.adapter.inbound.rest.response.queue.QueueDisplayItemResponse(
+                result.id(),
+                result.queueNumber(),
+                result.patientInitials(),
+                result.status(),
+                result.priority(),
+                result.calledAt()
+        );
+    }
 }

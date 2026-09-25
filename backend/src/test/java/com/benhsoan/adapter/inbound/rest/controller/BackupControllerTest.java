@@ -1,6 +1,7 @@
 package com.benhsoan.adapter.inbound.rest.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -56,6 +57,14 @@ class BackupControllerTest {
     private RestoreBackupUseCase restoreBackupUseCase;
     @MockitoBean
     private DownloadBackupUseCase downloadBackupUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.backup.GetBackupScheduleUseCase getBackupScheduleUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.backup.UpdateBackupScheduleUseCase updateBackupScheduleUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.backup.DismissBackupAlertUseCase dismissBackupAlertUseCase;
+    @MockitoBean
+    private com.benhsoan.port.inbound.backup.VerifyBackupIntegrityUseCase verifyBackupIntegrityUseCase;
 
     @MockitoBean
     private JwtTokenPort jwtTokenPort;
@@ -115,6 +124,92 @@ class BackupControllerTest {
         mockMvc.perform(get("/backups/{id}/download", BACKUP_ID))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"BKP-20260814-0001.json\""));
+    }
+
+    @Test
+    void getsSchedule() throws Exception {
+        com.benhsoan.domain.backup.BackupScheduleConfiguration config =
+                com.benhsoan.domain.backup.BackupScheduleConfiguration.createDefault(BACKUP_ID, Instant.parse("2026-08-14T08:00:00Z"));
+        when(getBackupScheduleUseCase.getSchedule()).thenReturn(config);
+
+        mockMvc.perform(get("/backups/schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dailyTime").value("02:00"))
+                .andExpect(jsonPath("$.enabled").value(false));
+    }
+
+    @Test
+    void updatesSchedule() throws Exception {
+        com.benhsoan.domain.backup.BackupScheduleConfiguration config =
+                com.benhsoan.domain.backup.BackupScheduleConfiguration.createDefault(BACKUP_ID, Instant.parse("2026-08-14T08:00:00Z"));
+        config.updateSchedule(true, "03:30", BACKUP_ID, Instant.parse("2026-08-14T08:00:00Z"));
+        when(updateBackupScheduleUseCase.updateSchedule(eq(true), eq("03:30"))).thenReturn(config);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/backups/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"dailyTime\":\"03:30\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.dailyTime").value("03:30"));
+    }
+
+    @Test
+    void updatesScheduleRejectsInvalidDailyTime() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/backups/schedule")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"dailyTime\":\"25:00\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void dismissesAlert() throws Exception {
+        com.benhsoan.domain.backup.BackupScheduleConfiguration config =
+                com.benhsoan.domain.backup.BackupScheduleConfiguration.createDefault(BACKUP_ID, Instant.parse("2026-08-14T08:00:00Z"));
+        when(dismissBackupAlertUseCase.dismissAlert()).thenReturn(config);
+
+        mockMvc.perform(post("/backups/schedule/dismiss-alert"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alertActive").value(false));
+    }
+
+    @Test
+    void verifiesLatestBackup() throws Exception {
+        com.benhsoan.domain.backup.BackupVerificationReport report =
+                com.benhsoan.domain.backup.BackupVerificationReport.success(
+                        BACKUP_ID,
+                        "BKP-20260814-0001",
+                        "BKP-20260814-0001.json",
+                        28,
+                        200,
+                        "87",
+                        Instant.parse("2026-08-14T08:00:00Z")
+                );
+        when(verifyBackupIntegrityUseCase.verifyLatest()).thenReturn(report);
+
+        mockMvc.perform(post("/backups/verify-latest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.tableCount").value(28))
+                .andExpect(jsonPath("$.message").value("Bản sao lưu đọc được và đủ dữ liệu."));
+    }
+
+    @Test
+    void verifiesBackupById() throws Exception {
+        com.benhsoan.domain.backup.BackupVerificationReport report =
+                com.benhsoan.domain.backup.BackupVerificationReport.success(
+                        BACKUP_ID,
+                        "BKP-20260814-0001",
+                        "BKP-20260814-0001.json",
+                        28,
+                        200,
+                        "87",
+                        Instant.parse("2026-08-14T08:00:00Z")
+                );
+        when(verifyBackupIntegrityUseCase.verifyById(eq(BACKUP_ID))).thenReturn(report);
+
+        mockMvc.perform(post("/backups/{id}/verify", BACKUP_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true));
     }
 
     private BackupResult backupResult() {

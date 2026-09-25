@@ -68,6 +68,18 @@ class BackupRecordTest {
         record.markFailed();
 
         assertEquals(BackupStatus.FAILED, record.getStatus());
+        assertNull(record.getFailureReason());
+        assertFalse(record.isRestorable());
+    }
+
+    @Test
+    void markFailedWithReasonStoresReason() {
+        BackupRecord record = BackupRecord.create("BKP-20260814-0001", BackupType.SCHEDULED, null, ACTOR, NOW);
+
+        record.markFailed("Disk space full");
+
+        assertEquals(BackupStatus.FAILED, record.getStatus());
+        assertEquals("Disk space full", record.getFailureReason());
         assertFalse(record.isRestorable());
     }
 

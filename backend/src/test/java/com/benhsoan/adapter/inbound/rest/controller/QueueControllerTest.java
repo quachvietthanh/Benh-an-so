@@ -80,6 +80,7 @@ class QueueControllerTest {
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
     @MockitoBean private PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.queue.GetQueueDisplayUseCase getQueueDisplayUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -410,6 +411,44 @@ class QueueControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(prioritizeQueueItemUseCase);
+    }
+
+    @Test
+    void returnsWaitingRoomDisplayBoard() throws Exception {
+        UUID roomId = UUID.randomUUID();
+        LocalDate today = LocalDate.of(2026, 9, 24);
+        Instant now = Instant.parse("2026-09-24T08:00:00Z");
+
+        var calling = new com.benhsoan.port.dto.result.QueueDisplayItemResult(
+                UUID.randomUUID(), 1, "N. V. A", QueueItemStatus.IN_PROGRESS, QueuePriority.NORMAL, now.minusSeconds(100)
+        );
+        var waiting = new com.benhsoan.port.dto.result.QueueDisplayItemResult(
+                UUID.randomUUID(), 2, "T. T. B", QueueItemStatus.WAITING, QueuePriority.EMERGENCY, null
+        );
+        var room = new com.benhsoan.port.dto.result.RoomQueueDisplayResult(
+                roomId, "P101", "Phòng Khám Nội 1", UUID.randomUUID(), "BS. Hoàng",
+                calling, List.of(waiting)
+        );
+        var board = new com.benhsoan.port.dto.result.WaitingRoomBoardResult(today, now, List.of(room));
+
+        when(getQueueDisplayUseCase.getWaitingRoomDisplay(any())).thenReturn(board);
+
+        mockMvc.perform(get("/queues/display")
+                        .param("date", "2026-09-24"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value("2026-09-24"))
+                .andExpect(jsonPath("$.rooms[0].roomId").value(roomId.toString()))
+                .andExpect(jsonPath("$.rooms[0].roomNumber").value("P101"))
+                .andExpect(jsonPath("$.rooms[0].roomName").value("Phòng Khám Nội 1"))
+                .andExpect(jsonPath("$.rooms[0].doctorName").value("BS. Hoàng"))
+                .andExpect(jsonPath("$.rooms[0].currentCalling.queueNumber").value(1))
+                .andExpect(jsonPath("$.rooms[0].currentCalling.patientInitials").value("N. V. A"))
+                .andExpect(jsonPath("$.rooms[0].waitingList[0].queueNumber").value(2))
+                .andExpect(jsonPath("$.rooms[0].waitingList[0].patientInitials").value("T. T. B"))
+                .andExpect(jsonPath("$.rooms[0].waitingList[0].priority").value("EMERGENCY"))
+                .andExpect(jsonPath("$.rooms[0].currentCalling.patientId").doesNotExist())
+                .andExpect(jsonPath("$.rooms[0].currentCalling.fullName").doesNotExist())
+                .andExpect(jsonPath("$.rooms[0].currentCalling.phone").doesNotExist());
     }
 }
 

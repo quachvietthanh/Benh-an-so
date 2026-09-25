@@ -76,4 +76,53 @@ class BackupRecordRepositoryAdapterIntegrationTest {
         assertEquals(BackupStatus.IN_PROGRESS, saved.getStatus());
         assertNull(saved.getFileName());
     }
+
+    @Test
+    void hasActiveInProgressBackupRespectsCutoffTime() {
+        Instant now = Instant.parse("2026-09-24T10:00:00Z");
+        UUID actor = UUID.randomUUID();
+
+        // Stale record created 90 minutes ago
+        BackupRecord staleRecord = BackupRecord.create(
+                "BKP-STALE", BackupType.SCHEDULED, null, actor, now.minusSeconds(90 * 60));
+        adapter.save(staleRecord);
+
+        // Cutoff 60 minutes ago: stale record is BEFORE cutoff, so no active backup
+        Instant cutoff = now.minusSeconds(60 * 60);
+        org.junit.jupiter.api.Assertions.assertFalse(adapter.hasActiveInProgressBackup(cutoff));
+
+        // Fresh record created 30 minutes ago
+        BackupRecord freshRecord = BackupRecord.create(
+                "BKP-FRESH", BackupType.SCHEDULED, null, actor, now.minusSeconds(30 * 60));
+        adapter.save(freshRecord);
+
+        // Now has active in-progress backup after cutoff
+        assertTrue(adapter.hasActiveInProgressBackup(cutoff));
+    }
+
+    @Test
+    void findLatestByStatusReturnsMostRecentMatchingRecord() {
+        Instant base = Instant.parse("2026-09-24T10:00:00Z");
+        UUID actor = UUID.randomUUID();
+
+        BackupRecord rec1 = BackupRecord.create("BKP-01", BackupType.FULL, "first", actor, base);
+        rec1.markSuccess("file1.json", 100L);
+        adapter.save(rec1);
+
+        BackupRecord rec2 = BackupRecord.create("BKP-02", BackupType.SCHEDULED, "second", actor, base.plusSeconds(60));
+        rec2.markFailed("Error");
+        adapter.save(rec2);
+
+        BackupRecord rec3 = BackupRecord.create("BKP-03", BackupType.SCHEDULED, "third", actor, base.plusSeconds(120));
+        rec3.markSuccess("file3.json", 300L);
+        adapter.save(rec3);
+
+        Optional<BackupRecord> latestSuccess = adapter.findLatestByStatus(BackupStatus.SUCCESS);
+        assertTrue(latestSuccess.isPresent());
+        assertEquals("BKP-03", latestSuccess.get().getBackupCode());
+
+        Optional<BackupRecord> latestFailed = adapter.findLatestByStatus(BackupStatus.FAILED);
+        assertTrue(latestFailed.isPresent());
+        assertEquals("BKP-02", latestFailed.get().getBackupCode());
+    }
 }

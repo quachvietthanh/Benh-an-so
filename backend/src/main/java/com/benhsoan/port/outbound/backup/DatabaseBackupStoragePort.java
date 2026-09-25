@@ -7,4 +7,10 @@ public interface DatabaseBackupStoragePort {
     BackupSnapshot loadSnapshot(String fileName);
 
     void restoreSnapshot(String fileName);
+
+    com.benhsoan.domain.backup.BackupVerificationReport verifySnapshot(
+            java.util.UUID backupId,
+            String backupCode,
+            String fileName
+    );
 }

@@ -52,6 +52,7 @@ public class ReplaceMedicalRecordDiagnosesService implements ReplaceMedicalRecor
         UUID actorId = authorizationService.requireDiagnosisWriteAccess(medicalRecordId);
         MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
+        authorizationService.ensureNotArchived(record, actorId, "Cập nhật chẩn đoán bệnh án");
         record.ensureEditable();
         var visit = visitRepository.findById(record.getVisitId())
                 .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
