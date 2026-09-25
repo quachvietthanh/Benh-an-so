@@ -10,6 +10,7 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionI
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckMaxDailyDoseRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.DispenseItemRequest;
@@ -40,6 +41,8 @@ import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
+import com.benhsoan.port.dto.command.prescription.CheckMaxDailyDoseCommand;
+import com.benhsoan.port.dto.command.prescription.CheckMaxDailyDoseItemCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
@@ -70,13 +73,17 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionAllerg
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionContraindicationOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionMaxDailyDoseOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseMissingDataResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseCheckResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseCheckResult;
 import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
 
 @Component
@@ -613,6 +620,34 @@ public class PrescriptionRestMapper {
         return new MaxDailyDoseMissingDataResponse(
                 result.activeIngredient(),
                 result.reason()
+        );
+    }
+
+    public CheckMaxDailyDoseCommand toCommand(CheckMaxDailyDoseRequest request) {
+        return new CheckMaxDailyDoseCommand(
+                request.medicalRecordId(),
+                request.items().stream()
+                        .map(item -> new CheckMaxDailyDoseItemCommand(
+                                item.medicineId(),
+                                item.singleDoseQuantity(),
+                                item.frequency()
+                        ))
+                        .toList()
+        );
+    }
+
+    public MaxDailyDoseCheckResponse toResponse(MaxDailyDoseCheckResult result) {
+        return new MaxDailyDoseCheckResponse(
+                result.warnings().stream().map(this::toResponse).toList(),
+                result.missingData().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private MaxDailyDoseWarningResponse toResponse(MaxDailyDoseWarningResult result) {
+        return new MaxDailyDoseWarningResponse(
+                result.activeIngredient(),
+                result.totalDailyDoseMg(),
+                result.maxDailyDoseMg()
         );
     }
 

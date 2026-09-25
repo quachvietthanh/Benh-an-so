@@ -25,11 +25,13 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionR
 import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckContraindicationRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckMaxDailyDoseRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.DispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PartialDispensePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.ReturnMedicationRequest;
 import com.benhsoan.adapter.inbound.rest.response.prescription.ContraindicationCheckResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseCheckResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseHistoryResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispensePrescriptionResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.DispenseSuggestionResponse;
@@ -45,6 +47,7 @@ import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
+import com.benhsoan.port.inbound.prescription.CheckMaxDailyDoseUseCase;
 import com.benhsoan.port.inbound.prescription.CreatePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.DispensePrescriptionItemsUseCase;
@@ -91,6 +94,7 @@ public class PrescriptionController {
         private final CheckDrugInteractionUseCase checkDrugInteractionUseCase;
         private final CheckPatientDrugAllergyUseCase checkPatientDrugAllergyUseCase;
         private final CheckContraindicationUseCase checkContraindicationUseCase;
+        private final CheckMaxDailyDoseUseCase checkMaxDailyDoseUseCase;
         private final GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
         private final ExportPrescriptionUseCase exportPrescriptionUseCase;
         private final SendPrescriptionInterconnectionUseCase sendPrescriptionInterconnectionUseCase;
@@ -260,6 +264,15 @@ public class PrescriptionController {
                         @Valid @RequestBody CheckContraindicationRequest request) {
                 return mapper.toResponse(
                                 checkContraindicationUseCase.check(request.medicalRecordId(), request.medicineIds()));
+        }
+
+        @PostMapping("/check-max-daily-dose")
+        @RequirePermission({ "PRESCRIPTION_CREATE", "PRESCRIPTION_UPDATE" })
+        @Operation(summary = "Check total daily active-ingredient dose against the configured max (read-only)")
+        public MaxDailyDoseCheckResponse checkMaxDailyDose(
+                        @Valid @RequestBody CheckMaxDailyDoseRequest request) {
+                return mapper.toResponse(
+                                checkMaxDailyDoseUseCase.check(mapper.toCommand(request)));
         }
 
         @GetMapping("/allergy-warning-logs")

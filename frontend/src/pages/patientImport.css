@@ -1,0 +1,416 @@
+/* ==========================================================================
+   Patient Import (Nhập hồ sơ bệnh nhân từ tệp bảng tính) Styling
+   ========================================================================== */
+
+.patient-import-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+}
+
+/* Header & Breadcrumb */
+.patient-import-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.patient-import-title-group h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.patient-import-subtitle {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Card Wrappers */
+.patient-import-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+/* Wizard Steps Bar */
+.patient-import-steps-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.ant-steps-item-title {
+  font-weight: 600 !important;
+}
+
+/* KPI Overview Badges */
+.patient-import-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.patient-import-kpi-card {
+  padding: 16px 20px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.patient-import-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.patient-import-kpi-total {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.patient-import-kpi-valid {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.patient-import-kpi-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.patient-import-kpi-duplicate {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.patient-import-kpi-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.patient-import-kpi-valid .patient-import-kpi-label {
+  color: #15803d;
+}
+
+.patient-import-kpi-error .patient-import-kpi-label {
+  color: #b91c1c;
+}
+
+.patient-import-kpi-duplicate .patient-import-kpi-label {
+  color: #b45309;
+}
+
+.patient-import-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.patient-import-kpi-total .patient-import-kpi-value {
+  color: #0f172a;
+}
+
+.patient-import-kpi-valid .patient-import-kpi-value {
+  color: #16a34a;
+}
+
+.patient-import-kpi-error .patient-import-kpi-value {
+  color: #dc2626;
+}
+
+.patient-import-kpi-duplicate .patient-import-kpi-value {
+  color: #d97706;
+}
+
+.patient-import-kpi-subtext {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* Step 1: Upload Box & Template Callout */
+.patient-import-template-box {
+  background: #f0fdf4;
+  border: 1px dashed #86efac;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.patient-import-template-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.patient-import-template-icon {
+  font-size: 32px;
+  color: #16a34a;
+}
+
+.patient-import-template-text h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #166534;
+}
+
+.patient-import-template-text p {
+  margin: 0;
+  font-size: 13px;
+  color: #15803d;
+}
+
+.patient-import-dropzone {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  display: block;
+}
+
+.patient-import-dropzone .ant-upload.ant-upload-drag {
+  border: 2px dashed #cbd5e1 !important;
+  border-radius: 12px !important;
+  background: #f8fafc !important;
+  padding: 32px 20px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer;
+}
+
+.patient-import-dropzone .ant-upload.ant-upload-drag:hover {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+}
+
+.patient-import-file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-top: 16px;
+}
+
+.patient-import-file-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.patient-import-file-icon {
+  font-size: 24px;
+  color: #16a34a;
+}
+
+.patient-import-demo-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Step 2: 3 Groups Preview Styling */
+.patient-import-preview-tabs .ant-tabs-nav {
+  margin-bottom: 18px;
+}
+
+.patient-import-tab-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.patient-import-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.patient-import-badge-valid {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.patient-import-badge-error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.patient-import-badge-duplicate {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* Error Table Highlights */
+.patient-import-error-row-number {
+  font-weight: 700;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.patient-import-error-field {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.patient-import-error-reason {
+  color: #b91c1c;
+  line-height: 1.4;
+}
+
+.patient-import-raw-data {
+  font-family: monospace;
+  font-size: 12px;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Duplicate Candidates Row & Comparison */
+.patient-import-dup-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patient-import-dup-existing {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #92400e;
+}
+
+/* Step 3: Result & Completion */
+.patient-import-result-card {
+  text-align: center;
+  padding: 36px 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.patient-import-success-icon {
+  font-size: 56px;
+  color: #16a34a;
+  margin-bottom: 16px;
+}
+
+.patient-import-codes-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.patient-import-code-tag {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.patient-import-code-tag:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  transform: scale(1.03);
+}
+
+/* Loading Overlay / Progress */
+.patient-import-loading-state {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.patient-import-loading-spinner {
+  font-size: 40px;
+  color: #2563eb;
+  margin-bottom: 16px;
+}
+
+/* Audit Log Table */
+.patient-import-audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Responsive Tweaks */
+@media (max-width: 768px) {
+  .patient-import-container {
+    padding: 12px;
+  }
+  .patient-import-steps-card {
+    padding: 16px;
+  }
+  .patient-import-template-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

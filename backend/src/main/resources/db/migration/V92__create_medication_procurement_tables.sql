@@ -83,12 +83,12 @@ CREATE INDEX idx_procurement_items_medicine ON medication_procurement_items(medi
 
 CREATE TABLE medication_procurement_code_sequences (
     code_prefix VARCHAR(10) NOT NULL,
-    last_value BIGINT NOT NULL,
+    `last_value` BIGINT NOT NULL,
     CONSTRAINT pk_medication_procurement_code_sequences PRIMARY KEY (code_prefix),
-    CONSTRAINT chk_procurement_code_sequences_last_value CHECK (last_value >= 0)
+    CONSTRAINT chk_procurement_code_sequences_last_value CHECK (`last_value` >= 0)
 );
 
-INSERT INTO medication_procurement_code_sequences (code_prefix, last_value)
+INSERT INTO medication_procurement_code_sequences (code_prefix, `last_value`)
 VALUES ('DT', 0);
 
 -- ===========================

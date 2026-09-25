@@ -51,6 +51,7 @@ import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.DispensePrescriptionCommand;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.inbound.prescription.CheckContraindicationUseCase;
+import com.benhsoan.port.inbound.prescription.CheckMaxDailyDoseUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CancelPrescriptionUseCase;
@@ -125,6 +126,9 @@ class PrescriptionControllerTest {
 
     @MockitoBean
     private CheckContraindicationUseCase checkContraindicationUseCase;
+
+    @MockitoBean
+    private CheckMaxDailyDoseUseCase checkMaxDailyDoseUseCase;
 
     @MockitoBean
     private GetPrescriptionAllergyWarningLogsUseCase getPrescriptionAllergyWarningLogsUseCase;
