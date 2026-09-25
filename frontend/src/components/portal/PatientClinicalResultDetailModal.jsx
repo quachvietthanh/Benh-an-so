@@ -12,7 +12,6 @@ import {
   Row,
   Skeleton,
   Space,
-  Table,
   Tag,
   Tooltip,
   Typography,
@@ -81,14 +80,9 @@ function PatientClinicalResultDetailModal({
         }
       } catch (err) {
         if (isMounted) {
-          if (initialSummary) {
-            setDetail(initialSummary)
-            setError('')
-          } else {
-            const safeMsg = getSecuritySafeErrorMessage(err)
-            setError(safeMsg)
-            setDetail(null)
-          }
+          const safeMsg = getSecuritySafeErrorMessage(err)
+          setError(safeMsg)
+          setDetail(null)
         }
       } finally {
         if (isMounted) {
@@ -102,7 +96,7 @@ function PatientClinicalResultDetailModal({
     return () => {
       isMounted = false
     }
-  }, [open, resultId, initialSummary])
+  }, [open, resultId])
 
   const currentData = detail || initialSummary
   const serviceName = currentData?.serviceName || 'Chi tiết kết quả cận lâm sàng'
@@ -120,22 +114,8 @@ function PatientClinicalResultDetailModal({
       downloadPdfBlob(res.data, filename)
       message.success('Đã tải phiếu kết quả cận lâm sàng!')
     } catch (err) {
-      try {
-        const { createMockPdfBlob } = await import('../../utils/patientClinicalResultMockData')
-        const mockBlob = createMockPdfBlob(serviceName, {
-          patientName: '0966069024',
-          doctorName: currentData?.doctorName,
-          specialtyName: currentData?.specialtyName,
-          details: `Dịch vụ: ${serviceName} (${serviceCode})\nKết quả: ${currentData?.numericValue != null ? `${currentData.numericValue} ${currentData.unit}` : currentData?.textValue}`,
-          conclusion: currentData?.conclusion,
-        })
-        const filename = `ket-qua-${serviceCode || 'CLS'}-${formatDate(currentData?.enteredAt)}.pdf`
-        downloadPdfBlob(mockBlob, filename)
-        message.success(`Đã tải phiếu kết quả: ${serviceName}!`)
-      } catch {
-        const msg = getSecuritySafeErrorMessage(err)
-        message.error(msg)
-      }
+      const msg = getSecuritySafeErrorMessage(err)
+      message.error(msg)
     } finally {
       setDownloading(false)
     }
@@ -445,94 +425,6 @@ function PatientClinicalResultDetailModal({
               >
                 {currentData.textValue || 'Đã ghi nhận kết quả theo hồ sơ chuyên môn.'}
               </div>
-            </Card>
-          )}
-
-          {/* Bảng chi tiết các chỉ số xét nghiệm (nếu có danh sách thông số con) */}
-          {Array.isArray(currentData.parameters) && currentData.parameters.length > 0 && (
-            <Card
-              size="small"
-              style={{
-                borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: '#334155',
-                  marginBottom: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <ExperimentOutlined style={{ color: '#2563eb' }} />
-                <span>BẢNG CHI TIẾT CÁC THÔNG SỐ XÉT NGHIỆM ({currentData.parameters.length})</span>
-              </div>
-              <Table
-                dataSource={currentData.parameters}
-                rowKey={(p, i) => p.parameterCode || i}
-                pagination={false}
-                size="small"
-                bordered
-                columns={[
-                  {
-                    title: 'Tên chỉ số',
-                    dataIndex: 'parameterName',
-                    key: 'parameterName',
-                    render: (text, record) => (
-                      <div>
-                        <strong style={{ color: '#0f172a' }}>{text}</strong>
-                        {record.parameterCode && (
-                          <span style={{ fontSize: 11, color: '#64748b', marginLeft: 6 }}>
-                            ({record.parameterCode})
-                          </span>
-                        )}
-                      </div>
-                    ),
-                  },
-                  {
-                    title: 'Kết quả đo',
-                    key: 'value',
-                    render: (_, record) => {
-                      const ab = getAbnormalFlagInfo(record.abnormalFlag)
-                      return (
-                        <span style={{ fontWeight: 700, color: ab.textColor }}>
-                          {record.numericValue != null
-                            ? `${record.numericValue} ${record.unit || ''}`
-                            : record.textValue || '—'}
-                        </span>
-                      )
-                    },
-                  },
-                  {
-                    title: 'Khoảng tham chiếu',
-                    key: 'referenceRange',
-                    render: (_, record) => (
-                      <span style={{ color: '#475569', fontSize: 12 }}>
-                        {record.referenceRange ||
-                          `${record.lowerBound ?? '—'} - ${record.upperBound ?? '—'} ${record.unit || ''}`}
-                      </span>
-                    ),
-                  },
-                  {
-                    title: 'Đánh giá',
-                    key: 'status',
-                    width: 140,
-                    render: (_, record) => {
-                      const ab = getAbnormalFlagInfo(record.abnormalFlag)
-                      return (
-                        <Tag color={ab.color} style={{ fontSize: 11.5, fontWeight: 600, borderRadius: 6, margin: 0 }}>
-                          {ab.text}
-                        </Tag>
-                      )
-                    },
-                  },
-                ]}
-              />
             </Card>
           )}
 
