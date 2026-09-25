@@ -54,6 +54,7 @@ import {
   SyncOutlined,
   WarningOutlined,
   FireOutlined,
+  BookOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
@@ -63,11 +64,13 @@ import queueApi from '../api/queueApi'
 import visitApi from '../api/visitApi'
 import patientAllergyApi from '../api/patientAllergyApi'
 import contraindicationApi from '../api/contraindicationApi'
+import prescriptionTemplateApi from '../api/prescriptionTemplateApi.js'
 import InteractionWarningModal from '../components/pharmacy/InteractionWarningModal'
 import PrescriptionAllergyWarningModal from '../components/pharmacy/PrescriptionAllergyWarningModal.jsx'
 import PrescriptionAllergyWarningLogsModal from '../components/pharmacy/PrescriptionAllergyWarningLogsModal.jsx'
 import ContraindicationWarningPanel from '../components/prescription/ContraindicationWarningPanel'
 import ContraindicationOverrideModal from '../components/prescription/ContraindicationOverrideModal'
+import PrescriptionTemplateWarningsModal from '../components/prescription/PrescriptionTemplateWarningsModal.jsx'
 import QuickUpdatePregnancyModal from '../components/prescription/QuickUpdatePregnancyModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
@@ -145,21 +148,12 @@ const PRESET_CHANGE_REASONS = [
   'Bỏ bớt thuốc do bệnh nhân đã ổn định hoặc có phản ứng phụ',
 ]
 
-const ROUTE_OPTIONS = [
-  { value: 'ORAL', label: 'Uống' },
-  { value: 'TOPICAL', label: 'Bôi ngoài da' },
-  { value: 'INHALATION', label: 'Hít / Khí dung' },
-  { value: 'OPHTHALMIC', label: 'Nhỏ / Tra mắt' },
-  { value: 'NASAL', label: 'Xịt / Nhỏ mũi' },
-  { value: 'OTIC', label: 'Nhỏ tai' },
-  { value: 'SUBLINGUAL', label: 'Ngậm dưới lưỡi' },
-  { value: 'RECTAL', label: 'Đặt hậu môn / Trực tràng' },
-  { value: 'INTRAVENOUS', label: 'Tiêm tĩnh mạch' },
-  { value: 'INTRAMUSCULAR', label: 'Tiêm bắp' },
-  { value: 'SUBCUTANEOUS', label: 'Tiêm dưới da' },
-  { value: 'TRANSDERMAL', label: 'Dán ngoài da' },
-  { value: 'OTHER', label: 'Cách dùng khác' },
-]
+import {
+  ROUTE_OPTIONS,
+  hasSafetyWarnings,
+  mapTemplateErrorMessage,
+  mapDraftItemToFormItem,
+} from '../utils/prescriptionTemplateHelpers.js'
 
 let localItemSequence = 0
 const createEmptyItem = (isOriginal = false) => ({
@@ -259,6 +253,15 @@ function PrescriptionPage() {
   const [selectedPrescriptionForHistory, setSelectedPrescriptionForHistory] = useState(null)
   const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [selectedPrescriptionForReturn, setSelectedPrescriptionForReturn] = useState(null)
+
+  // NCL-05-CN-008: Bộ đơn thuốc mẫu theo chẩn đoán
+  const [templates, setTemplates] = useState([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null)
+  const [applyingTemplate, setApplyingTemplate] = useState(false)
+  const [templateSafetyModalOpen, setTemplateSafetyModalOpen] = useState(false)
+  const [pendingTemplateData, setPendingTemplateData] = useState(null)
+  const [appliedSkippedItems, setAppliedSkippedItems] = useState([])
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -924,6 +927,132 @@ function PrescriptionPage() {
       }
     }
   }, [items, medicalRecordId, performMaxDailyDoseCheck])
+
+  // NCL-05-CN-008: Tự động tải đơn thuốc mẫu theo chẩn đoán lượt khám
+  const primaryDiagnosis = useMemo(() => {
+    if (!Array.isArray(diagnoses) || diagnoses.length === 0) return null
+    return diagnoses.find((d) => d.diagnosisType === 'PRIMARY') || diagnoses[0]
+  }, [diagnoses])
+
+  const currentDiagnosisCode = useMemo(() => {
+    return (primaryDiagnosis?.code || primaryDiagnosis?.diagnosisCode || '').trim()
+  }, [primaryDiagnosis])
+
+  const loadTemplates = useCallback(async (code) => {
+    const diagCode = code || currentDiagnosisCode
+    if (!diagCode) {
+      setTemplates([])
+      return
+    }
+    setLoadingTemplates(true)
+    try {
+      const res = await prescriptionTemplateApi.list(diagCode)
+      const list = Array.isArray(res?.data) ? res.data : []
+      setTemplates(list)
+    } catch (err) {
+      console.warn('Lỗi khi nạp danh sách đơn mẫu:', err)
+      setTemplates([])
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }, [currentDiagnosisCode])
+
+  useEffect(() => {
+    if (currentDiagnosisCode) {
+      loadTemplates(currentDiagnosisCode)
+    } else {
+      setTemplates([])
+    }
+  }, [currentDiagnosisCode, loadTemplates])
+
+  const executeApplyTemplateItems = useCallback((data) => {
+    const draftItems = Array.isArray(data.items) ? data.items : []
+    if (draftItems.length === 0) {
+      message.warning('Đơn thuốc mẫu này không có thuốc nào khả dụng để áp dụng.')
+      return
+    }
+
+    // Điền toàn bộ items vào danh sách thuốc trong form kê đơn hiện có
+    const newFormItems = draftItems.map((item, idx) => mapDraftItemToFormItem(item, idx))
+    setItems(newFormItems)
+
+    // Cập nhật cảnh báo nếu có từ backend để các tag/panel trên trang hiển thị đầy đủ
+    if (Array.isArray(data.interactionWarnings)) {
+      setDetectedInteractions(data.interactionWarnings)
+    }
+    if (Array.isArray(data.allergyWarnings)) {
+      setDetectedAllergyWarnings(data.allergyWarnings)
+    }
+    if (Array.isArray(data.contraindicationWarnings)) {
+      setDetectedContraindicationWarnings(data.contraindicationWarnings)
+    }
+    if (Array.isArray(data.contraindicationMissingData)) {
+      setDetectedContraindicationMissingData(data.contraindicationMissingData)
+    }
+
+    // Xử lý skippedItems
+    if (Array.isArray(data.skippedItems) && data.skippedItems.length > 0) {
+      setAppliedSkippedItems(data.skippedItems)
+    } else {
+      setAppliedSkippedItems([])
+    }
+
+    // Trigger auto dosage & safety re-check on the new items
+    performInteractionCheck(newFormItems).catch(() => {})
+    performAllergyCheck(newFormItems).catch(() => {})
+    performContraindicationCheck(newFormItems).catch(() => {})
+    performMaxDailyDoseCheck(newFormItems)
+  }, [medicines, patientAllergies, performInteractionCheck, performAllergyCheck, performContraindicationCheck, performMaxDailyDoseCheck])
+
+  const handleApplyTemplate = useCallback(async (templateId) => {
+    if (!templateId) return
+    if (!medicalRecordId) {
+      message.error('Không tìm thấy mã bệnh án để áp dụng đơn thuốc mẫu.')
+      return
+    }
+
+    setApplyingTemplate(true)
+    try {
+      const res = await prescriptionTemplateApi.apply(templateId, medicalRecordId)
+      const data = res?.data || {}
+
+      const templateObj = templates.find((t) => t.id === templateId)
+      const templateName = templateObj
+        ? `${templateObj.diagnosisName || templateObj.diagnosisCode} (${templateObj.items?.length || 0} thuốc)`
+        : data.diagnosisName || data.diagnosisCode
+
+      if (hasSafetyWarnings(data)) {
+        setPendingTemplateData({
+          ...data,
+          templateTitle: templateName,
+        })
+        setTemplateSafetyModalOpen(true)
+      } else {
+        executeApplyTemplateItems(data)
+        message.success(`Đã áp dụng đơn thuốc mẫu "${templateName}" vào đơn thành công.`)
+      }
+    } catch (error) {
+      message.error(mapTemplateErrorMessage(error))
+    } finally {
+      setApplyingTemplate(false)
+    }
+  }, [medicalRecordId, templates, executeApplyTemplateItems])
+
+  const handleConfirmTemplateSafety = useCallback(() => {
+    if (pendingTemplateData) {
+      executeApplyTemplateItems(pendingTemplateData)
+      message.info('Đã điền danh sách thuốc từ đơn mẫu vào form. Vui lòng kiểm tra và xác nhận từng thuốc trước khi tạo đơn.')
+      setPendingTemplateData(null)
+      setTemplateSafetyModalOpen(false)
+    }
+  }, [pendingTemplateData, executeApplyTemplateItems])
+
+  const handleCancelTemplateSafety = useCallback(() => {
+    setPendingTemplateData(null)
+    setTemplateSafetyModalOpen(false)
+    setSelectedTemplateId(null)
+    message.info('Đã hủy áp dụng đơn thuốc mẫu.')
+  }, [])
 
   const handleConfirmSpecialControlPrescribe = (reason) => {
     if (!pendingSpecialControlData) return
@@ -2777,6 +2906,135 @@ function PrescriptionPage() {
                     </div>
                   }
                 >
+                  {/* NCL-05-CN-008: Áp dụng đơn thuốc mẫu theo chẩn đoán */}
+                  {!editingPrescription && (
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        padding: '12px 16px',
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: 8,
+                      }}
+                    >
+                      {/* Tiêu đề & Thông tin chẩn đoán */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Space size={6} align="center">
+                          <BookOutlined style={{ color: '#16a34a', fontSize: 16 }} />
+                          <span style={{ fontWeight: 600, color: '#166534', fontSize: 13 }}>
+                            Áp dụng đơn thuốc mẫu (theo chẩn đoán hiện tại)
+                          </span>
+                          {currentDiagnosisCode && (
+                            <Tag color="cyan" style={{ margin: 0, fontWeight: 500, borderRadius: 4 }}>
+                              Chẩn đoán: {currentDiagnosisCode}
+                            </Tag>
+                          )}
+                        </Space>
+
+                        {templates.length > 0 && (
+                          <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>
+                            Có <strong>{templates.length}</strong> bộ mẫu khả dụng
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Hàng chọn mẫu & Nút thao tác cân đối trên cùng một hàng */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                        <Select
+                          showSearch
+                          allowClear
+                          style={{ flex: 1 }}
+                          placeholder="Chọn đơn thuốc mẫu gắn với chẩn đoán hiện tại..."
+                          value={selectedTemplateId}
+                          loading={loadingTemplates || applyingTemplate}
+                          disabled={!canPrescribe || saving || loadingTemplates || applyingTemplate}
+                          onChange={(val) => {
+                            setSelectedTemplateId(val)
+                            if (val) handleApplyTemplate(val)
+                          }}
+                          optionFilterProp="label"
+                          options={templates.map((tpl) => ({
+                            value: tpl.id,
+                            label: `Mẫu: ${tpl.diagnosisName || tpl.diagnosisCode} (${tpl.items?.length || 0} thuốc) — Tạo ngày ${dayjs(tpl.createdAt).format('DD/MM/YYYY')}`,
+                          }))}
+                          notFoundContent={
+                            loadingTemplates ? (
+                              <Spin size="small" />
+                            ) : (
+                              <div style={{ padding: '8px 12px', fontSize: 12, color: '#64748b' }}>
+                                {currentDiagnosisCode
+                                  ? `Chưa có đơn mẫu nào cho chẩn đoán [${currentDiagnosisCode}]. Bác sĩ có thể lưu đơn thuốc này thành mẫu sau khi kê.`
+                                  : 'Lượt khám chưa có mã chẩn đoán để tìm mẫu phù hợp.'}
+                              </div>
+                            )
+                          }
+                          id="select-prescription-template"
+                        />
+
+                        {currentDiagnosisCode && (
+                          <Button
+                            icon={<SyncOutlined spin={loadingTemplates} />}
+                            onClick={() => loadTemplates(currentDiagnosisCode)}
+                            disabled={loadingTemplates}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              borderColor: '#86efac',
+                              color: '#15803d',
+                              backgroundColor: '#ffffff',
+                              fontWeight: 500,
+                              flexShrink: 0,
+                              height: 32,
+                            }}
+                          >
+                            Làm mới mẫu
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {appliedSkippedItems.length > 0 && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      closable
+                      onClose={() => setAppliedSkippedItems([])}
+                      icon={<WarningOutlined style={{ fontSize: 18, color: '#d97706' }} />}
+                      message={
+                        <Text strong style={{ color: '#b45309' }}>
+                          LƯU Ý: CÓ {appliedSkippedItems.length} THUỐC TRONG MẪU BỊ BỎ QUA DO KHÔNG KHẢ DỤNG
+                        </Text>
+                      }
+                      description={
+                        <div style={{ marginTop: 4 }}>
+                          <div>Đơn thuốc mẫu không thể áp dụng đủ 100% do một số thuốc đã ngừng sử dụng hoặc không còn trong danh mục:</div>
+                          <ul style={{ margin: '6px 0 6px 18px', padding: 0 }}>
+                            {appliedSkippedItems.map((sk, idx) => (
+                              <li key={idx}>
+                                <Text strong>{sk.medicineName || 'Thuốc'}:</Text>{' '}
+                                <Tag color="volcano">{sk.reason || 'Đã ngừng sử dụng'}</Tag>
+                              </li>
+                            ))}
+                          </ul>
+                          <div style={{ fontWeight: 600, color: '#92400e' }}>
+                            Khuyến cáo: Bác sĩ vui lòng chọn thuốc thay thế trong danh mục nếu cần thiết.
+                          </div>
+                        </div>
+                      }
+                      style={{ marginBottom: 16, border: '1.5px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 8 }}
+                    />
+                  )}
                   {activeAllergyWarnings.length > 0 && (
                     <Alert
                       type="error"
@@ -4307,11 +4565,28 @@ function PrescriptionPage() {
         patientName={encounter?.patient?.fullName || record?.patientName || routeState.patient?.fullName}
       />
 
+      <PrescriptionTemplateWarningsModal
+        open={templateSafetyModalOpen}
+        templateTitle={pendingTemplateData?.templateTitle || ''}
+        interactionWarnings={pendingTemplateData?.interactionWarnings || []}
+        allergyWarnings={pendingTemplateData?.allergyWarnings || []}
+        contraindicationWarnings={pendingTemplateData?.contraindicationWarnings || []}
+        contraindicationMissingData={pendingTemplateData?.contraindicationMissingData || []}
+        onCancel={handleCancelTemplateSafety}
+        onProceed={handleConfirmTemplateSafety}
+      />
+
       <PrescriptionDetailModal
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         prescription={selectedPrescriptionForDetail}
         medicines={medicines}
+        diagnoses={diagnoses}
+        onTemplateSaved={() => {
+          if (currentDiagnosisCode) {
+            loadTemplates(currentDiagnosisCode)
+          }
+        }}
         canEdit={canPrescribe}
         canCancel={canCancelPrescription({ userRoles: roles, userPermissions, prescription: selectedPrescriptionForDetail, currentUserId: currentUser?.id }).allowed}
         onCancelClick={handleOpenCancelModal}
