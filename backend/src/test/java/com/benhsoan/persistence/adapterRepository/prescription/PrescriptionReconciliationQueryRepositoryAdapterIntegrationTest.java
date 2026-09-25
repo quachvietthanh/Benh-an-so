@@ -72,7 +72,7 @@ class PrescriptionReconciliationQueryRepositoryAdapterIntegrationTest {
     @BeforeEach
     void setUp() {
         adapter = new PrescriptionReconciliationQueryRepositoryAdapter(
-                prescriptionRepository, dispenseItemRepository, noteRepository);
+                entityManager, dispenseItemRepository, noteRepository);
     }
 
     private UUID persistPrescription(
@@ -417,5 +417,104 @@ class PrescriptionReconciliationQueryRepositoryAdapterIntegrationTest {
 
         assertTrue(page.getContent().isEmpty());
         assertEquals(0, page.getTotalElements());
+    }
+
+    @Test
+    void zeroOutcomeGroupsBehaveLikeNoOutcomeFilter() {
+        persistPrescription("RX000027", PrescriptionStatus.PENDING_DISPENSE,
+                InterconnectionStatus.SUCCESS, PERIOD_FROM.plusSeconds(10), PERIOD_FROM.plusSeconds(20));
+        persistPrescription("RX000028", PrescriptionStatus.CANCELLED,
+                InterconnectionStatus.NOT_SENT, PERIOD_FROM.plusSeconds(30), null);
+        flush();
+
+        Page<PrescriptionReconciliationItemResult> page = search(filter(PERIOD_FROM, PERIOD_TO, null));
+
+        assertEquals(2, page.getTotalElements());
+        assertEquals(2, page.getContent().size());
+    }
+
+    @Test
+    void oneOutcomeGroupKeepsTheExactCrossProductSemantics() {
+        persistPrescription("RX000033", PrescriptionStatus.DISPENSED,
+                InterconnectionStatus.SUCCESS, PERIOD_FROM.plusSeconds(40), PERIOD_FROM.plusSeconds(45));
+        persistPrescription("RX000034", PrescriptionStatus.PARTIALLY_DISPENSED,
+                InterconnectionStatus.SUCCESS, PERIOD_FROM.plusSeconds(50), PERIOD_FROM.plusSeconds(55));
+        persistPrescription("RX000035", PrescriptionStatus.DISPENSED,
+                InterconnectionStatus.FAILED, PERIOD_FROM.plusSeconds(60), PERIOD_FROM.plusSeconds(65));
+        flush();
+
+        Page<PrescriptionReconciliationItemResult> page = search(filter(
+                PERIOD_FROM, PERIOD_TO, null,
+                new ReconciliationOutcomeGroup(
+                        List.of(PrescriptionStatus.DISPENSED, PrescriptionStatus.PARTIALLY_DISPENSED),
+                        List.of(InterconnectionStatus.SUCCESS))));
+
+        assertEquals(2, page.getTotalElements());
+        assertTrue(page.getContent().stream()
+                .allMatch(row -> row.outcome() == PrescriptionReconciliationOutcome.CONSISTENT));
+    }
+
+    @Test
+    void threeOutcomeGroupsAreRepresentedWithoutAnArtificialMaximum() {
+        persistPrescription("RX000029", PrescriptionStatus.PENDING_DISPENSE,
+                InterconnectionStatus.SUCCESS, PERIOD_FROM.plusSeconds(40), PERIOD_FROM.plusSeconds(50));
+        persistPrescription("RX000030", PrescriptionStatus.DISPENSED,
+                InterconnectionStatus.FAILED, PERIOD_FROM.plusSeconds(60), PERIOD_FROM.plusSeconds(70));
+        persistPrescription("RX000031", PrescriptionStatus.CANCELLED,
+                InterconnectionStatus.NOT_SENT, PERIOD_FROM.plusSeconds(80), null);
+        persistPrescription("RX000032", PrescriptionStatus.DISPENSED,
+                InterconnectionStatus.SUCCESS, PERIOD_FROM.plusSeconds(90), PERIOD_FROM.plusSeconds(95));
+        flush();
+
+        Page<PrescriptionReconciliationItemResult> page = search(filter(
+                PERIOD_FROM, PERIOD_TO, null,
+                new ReconciliationOutcomeGroup(
+                        List.of(PrescriptionStatus.PENDING_DISPENSE),
+                        List.of(InterconnectionStatus.SUCCESS)),
+                new ReconciliationOutcomeGroup(
+                        List.of(PrescriptionStatus.DISPENSED),
+                        List.of(InterconnectionStatus.FAILED)),
+                new ReconciliationOutcomeGroup(
+                        List.of(PrescriptionStatus.CANCELLED),
+                        List.of(InterconnectionStatus.NOT_SENT))));
+
+        assertEquals(3, page.getTotalElements());
+        assertEquals(
+                List.of("RX000031", "RX000030", "RX000029"),
+                page.getContent().stream()
+                        .map(PrescriptionReconciliationItemResult::prescriptionCode)
+                        .toList());
+    }
+
+    @Test
+    void paginationTotalsAreCorrectAcrossEveryPage() {
+        for (int index = 0; index < 5; index++) {
+            persistPrescription("RX00004" + index, PrescriptionStatus.PENDING_DISPENSE,
+                    InterconnectionStatus.NOT_SENT, PERIOD_FROM.plusSeconds(100 + index), null);
+        }
+        flush();
+
+        ReconciliationQueryFilter filter = filter(PERIOD_FROM, PERIOD_TO, null);
+        Page<PrescriptionReconciliationItemResult> first =
+                adapter.findByFilter(filter, PageRequest.of(0, 2));
+        Page<PrescriptionReconciliationItemResult> second =
+                adapter.findByFilter(filter, PageRequest.of(1, 2));
+        Page<PrescriptionReconciliationItemResult> third =
+                adapter.findByFilter(filter, PageRequest.of(2, 2));
+
+        assertEquals(5, first.getTotalElements());
+        assertEquals(3, first.getTotalPages());
+        assertEquals(2, first.getContent().size());
+        assertEquals(2, second.getContent().size());
+        assertEquals(1, third.getContent().size());
+        assertEquals(5, second.getTotalElements());
+        assertEquals(5, third.getTotalElements());
+
+        Page<PrescriptionReconciliationItemResult> byCode = adapter.findByFilter(
+                filter(PERIOD_FROM, PERIOD_TO, "RX000043"), PageRequest.of(0, 2));
+
+        assertEquals(1, byCode.getTotalElements());
+        assertEquals(1, byCode.getContent().size());
+        assertEquals("RX000043", byCode.getContent().get(0).prescriptionCode());
     }
 }

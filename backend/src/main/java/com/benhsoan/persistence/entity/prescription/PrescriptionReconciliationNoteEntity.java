@@ -18,10 +18,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Append only reconciliation note (NCL-12-CN-007, migration V101).
+ * Append only reconciliation note (NCL-12-CN-007, migration V102).
  *
- * The table is never updated or deleted from application code. It intentionally has no
- * cascade delete so a reconciliation reason cannot disappear together with other data.
+ * The table is never updated, and application code only deletes from it through
+ * {@code MedicalRecordCascadeDeleter}, which removes the notes of a medical record before its
+ * prescriptions, exactly like the other prescription child tables.
  */
 @Entity
 @Table(name = "prescription_reconciliation_notes")

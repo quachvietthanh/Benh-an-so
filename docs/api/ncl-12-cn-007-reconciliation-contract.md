@@ -39,7 +39,7 @@ Source of truth: `project-workbook.xlsx` (sheets *Product Backlog*, *Tasks*, *Bu
 | Workbook item | Requirement | Where it is satisfied | Status |
 |---|---|---|---|
 | Story | List prescriptions by interconnection status + dispensing status and flag the two discrepancy cases | `GET /prescription-reconciliation` with `outcome` / `discrepanciesOnly` | Implemented |
-| Roles | ADMIN (*Quản trị viên*), PHARMACIST (*Dược sĩ*) | `PRESCRIPTION_RECONCILIATION_VIEW`, `PRESCRIPTION_RECONCILIATION_NOTE` granted to `ADMIN`, `PHARMACIST` (V101) | Implemented |
+| Roles | ADMIN (*Quản trị viên*), PHARMACIST (*Dược sĩ*) | `PRESCRIPTION_RECONCILIATION_VIEW`, `PRESCRIPTION_RECONCILIATION_NOTE` granted to `ADMIN`, `PHARMACIST` (V102) | Implemented |
 | Precondition | Prescriptions transmitted and/or dispensed in the period | Period predicate covers issuance, transmission **and** dispensing | Implemented |
 | QTN-21 | Electronic prescription has a unique identifier used for printing, lookup and interconnection | `prescriptionCode` is exposed per row; no new identifier is introduced | Reused |
 | CV-02 expected | Discrepant list displays correctly and can be handled by retransmission **or** note | Retransmission = existing NCL-12-CN-004 retry endpoint; note = `POST /prescription-reconciliation/{id}/notes` | Implemented |
@@ -200,7 +200,7 @@ enabled it is masked with `PatientAnonymizer.maskFullName(patientCode)`, exactly
 | RECEPTIONIST | NO | NO | NO |
 | MANAGER | NO | NO | NO |
 
-Only **two** permissions are introduced, both created by `V101` and granted to `ADMIN` and
+Only **two** permissions are introduced, both created by `V102` and granted to `ADMIN` and
 `PHARMACIST`:
 
 - `PRESCRIPTION_RECONCILIATION_VIEW` — list reconciliation + read notes
@@ -210,7 +210,7 @@ Only **two** permissions are introduced, both created by `V101` and granted to `
 `PRESCRIPTION_INTERCONNECTION_SEND`, `PRESCRIPTION_INTERCONNECTION_READ`, and the ADMIN-only
 authorization inside `RetryPrescriptionInterconnectionService`. A pharmacist does **not** gain
 retransmission capability through this story. This is enforced by the migration itself (a test
-asserts that the executable SQL of `V101` never references an interconnection permission).
+asserts that the executable SQL of `V102` never references an interconnection permission).
 
 Authorization is enforced twice, on the same permission codes:
 
@@ -252,7 +252,7 @@ First-time transmission remains with the responsible doctor through
 ## 9. Note / reason behavior
 
 Persistence is **new and append-only**: table `prescription_reconciliation_notes` (migration
-`V101`). `prescriptions.note`, `prescriptions.cancel_reason` and the audit log were deliberately
+`V102`). `prescriptions.note`, `prescriptions.cancel_reason` and the audit log were deliberately
 **not** reused:
 
 - `prescriptions.note` is the clinical note, and an interconnected prescription must not be modified
@@ -261,9 +261,21 @@ Persistence is **new and append-only**: table `prescription_reconciliation_notes
 - an audit record is a system trace, not a user-visible reconciliation reason
 
 A note row contains: the prescription, the reconciliation outcome (the workbook *discrepancy type*),
-the reason, the author and the timestamp. There is **no** update or delete operation, and no
-cascade-delete behavior is invented, so a reconciliation reason cannot disappear together with other
-data.
+the reason, the author and the timestamp. There is **no** update operation and no delete operation on
+the note repository. The only deletion path is `MedicalRecordCascadeDeleter`, which removes the notes
+of a medical record **before** deleting its prescriptions, exactly like `prescription_items`,
+`prescription_dispense_items`, `prescription_amendments`, `prescription_warning_logs` and
+`prescription_allergy_warning_logs`. Reconciliation notes are therefore prescription-scoped history:
+they never outlive the prescription they describe.
+
+> *Retention decision* — the workbook defines **no** retention or deletion rule for reconciliation
+> notes (`project-workbook.xlsx` has no row mentioning retention or deletion for NCL-12-CN-007). The
+> original schema instead declared a non-cascading `NOT NULL` foreign key hoping the note would
+> survive prescription deletion, which is impossible: that combination does not preserve the row, it
+> **blocks** the parent delete and broke `DeleteMedicalRecordService`. Deleting the notes with their
+> prescription is the behaviour consistent with every other prescription child table, and it is the
+> only option that keeps them reachable — the endpoints are prescription-scoped, so a note whose
+> prescription is gone could never be read again.
 
 Write semantics (`POST /prescription-reconciliation/{prescriptionId}/notes`):
 
@@ -277,6 +289,7 @@ Write semantics (`POST /prescription-reconciliation/{prescriptionId}/notes`):
 | `reason` longer than 500 characters | rejected (`@Size(max = 500)` → 400, and the domain aggregate rejects it too) |
 | `reason` whitespace | trimmed before persisting |
 | discrepancy type | **always computed server-side** from the current prescription state; a client-supplied value is never accepted |
+| outcome is not a discrepancy (`CONSISTENT`, `NOT_TRANSMITTED_NOT_DISPENSED`, `CANCELLED`) | rejected (`VALIDATION_FAILED` → 400); the note is not saved and no audit record is written. Only `TRANSMITTED_NOT_DISPENSED` and `DISPENSED_NOT_TRANSMITTED` accept a note |
 | author and timestamp | from `CurrentUserPort` and `ClockPort`; never from the request |
 | unknown prescription | 404 `PRESCRIPTION_NOT_FOUND` |
 | permission | `PRESCRIPTION_RECONCILIATION_NOTE` |
@@ -316,6 +329,7 @@ only the identifier, the outcome and the reason text.
 | `size` outside 1–100, or negative `page` | 400 | `VALIDATION_FAILED` |
 | Unknown `outcome` value | 400 | parameter type mismatch |
 | Blank or over-long note reason | 400 | `VALIDATION_FAILED` with field errors |
+| Note on a non-discrepancy prescription (`CONSISTENT`, `NOT_TRANSMITTED_NOT_DISPENSED`, `CANCELLED`) | 400 | `VALIDATION_FAILED` |
 | Unknown prescription on the note endpoints | 404 | `PRESCRIPTION_NOT_FOUND` |
 | Retry a non-`FAILED` interconnection (existing endpoint) | 400 | `VALIDATION_FAILED` / `PRESCRIPTION_INVALID_STATUS` |
 
@@ -335,11 +349,13 @@ pagination (`Page` / `PageRequest`) and error conventions.
 `PrescriptionReconciliationClassifier`), the append-only note aggregate + table + repository, the
 dedicated read adapter with a projection (chosen over the aggregate mapper, which loads prescription
 items per row and would create N+1), three use cases, three services, one access validator, one
-controller with three endpoints, and migration `V101`.
+controller with three endpoints, and migration `V102`.
 
-**Query cost per page is constant (3 queries):** the reconciliation projection (patient/doctor
+**Query cost per page is constant (4 queries):** the reconciliation projection (patient/doctor
 display context resolved with `left join` inside the same query), the paged count, and the batched
-dispensing/note lookups. It does not grow with page size.
+dispensing/note lookups. It does not grow with page size. Both the page query and the count query are
+assembled from the same predicate text in `PrescriptionReconciliationQueryRepositoryAdapter`, and the
+count query carries **no** display joins, because a left join on a primary key cannot remove a row.
 
 ---
 
@@ -366,6 +382,13 @@ dispensing/note lookups. It does not grow with page size.
    migration — this follows the existing convention (`chk_prescription_interconnection_logs_type`).
 7. **Notification on discrepancy is not implemented.** The workbook does not require notifying
    anyone when a discrepancy is found at reconciliation time, so no email/SMS/push path was added.
+8. **The same non-cascading foreign key on `prescription_interconnection_logs` (V21) is still not
+   handled.** `MedicalRecordCascadeDeleter` removes the reconciliation notes, but it still does not
+   remove interconnection logs, so deleting a medical record that has a transmitted prescription
+   remains broken on a foreign-key-enforcing database. This is a pre-existing **NCL-12-CN-004**
+   defect, unrelated to NCL-12-CN-007, and was deliberately left untouched by this task. The minimal
+   fix is one `deleteByPrescriptionIdIn` on `JpaPrescriptionInterconnectionLogRepository` plus one
+   line in the deleter, mirroring the reconciliation-note fix.
 
 ---
 
@@ -373,10 +396,11 @@ dispensing/note lookups. It does not grow with page size.
 
 | Item | Status |
 |---|---|
-| Focused NCL-12-CN-007 backend tests (domain matrix, services, controller, migration guard, H2 query) | **Executed** — 76 tests, 0 failures, 0 errors, 0 skipped |
-| Affected-area regression (NCL-12-CN-004 interconnect, dispensing NCL-06-CN-003/CN-008, prescription core/security) | **Executed** — 179 tests, 0 failures, 0 errors, 3 skipped (Docker-guarded MySQL classes) |
-| Full backend suite | **Executed** — 3245 tests, 4 failures, 5 errors, 55 skipped. The 4 failures and 5 errors are the pre-existing ones in `ContraindicationRuleControllerTest` (HTTP status expectations), `DoctorWeeklyTableControllerTest` (slice context load) and `LoginAttemptConcurrencyIntegrationTest` (concurrency/unique-index). None of those classes, and none of their production code, is touched by this task. |
-| MySQL migration (`V101`) applied by Flyway on a real MySQL server | **Not executed** — no Docker daemon is available in this environment, so Testcontainers/MySQL suites are skipped and `V101`'s MySQL-specific SQL (for example `UUID_TO_BIN(UUID())`) remains unverified. `V101` follows the exact convention of its neighbours `V77`, `V79` and `V98`. H2 verifies the JPQL projection and the JPA mapping of the note entity (Flyway is disabled in H2 slice tests by project convention). |
+| Focused NCL-12-CN-007 backend tests (domain matrix, services, controller, migration guard, H2 query, cascade delete) | **Executed** — 89 tests, 0 failures, 0 errors, 0 skipped |
+| Affected-area regression (`*Prescription*`, `*Reconciliation*`, `*MedicalRecord*`, `*Dispense*`, `*Interconnection*`) | **Executed** — 640 tests, 0 failures, 0 errors, 12 skipped (Docker-guarded MySQL classes) |
+| Full backend suite | **Executed** — 3377 tests, 5 failures, 6 errors, 55 skipped. All failing classes are pre-existing and unrelated: `ContraindicationRuleControllerTest` (3), `DoctorWeeklyTableControllerTest` (5) — documented before this task; `PatientImportEdgeCasesTest` (1) and `ExcelPatientSheetParserTest` (1, `NoClassDefFoundError`) — **re-verified to fail identically with this task's changes stashed**, in the patient-Excel-import area; `LoginAttemptConcurrencyIntegrationTest` is order-dependent and passes in isolation. None of them touches reconciliation, notes, prescriptions or medical-record deletion. |
+| MySQL migration (`V102`) applied by Flyway on a real MySQL server | **Not executed** — no Docker daemon is available in this environment, so Testcontainers/MySQL suites are skipped and `V102`'s MySQL-specific SQL (for example `UUID_TO_BIN(UUID())`) remains unverified. `V102` follows the exact convention of its neighbours `V77`, `V79` and `V98`. H2 verifies the JPQL projection and the JPA mapping of the note entity (Flyway is disabled in H2 slice tests by project convention). |
+| Medical-record deletion with reconciliation notes present | **Executed on H2** — `MedicalRecordCascadeDeleterReconciliationNoteIntegrationTest` adds the real non-cascading foreign key and deletes a medical record that has prescriptions with notes. It fails with `Referential integrity constraint violation` when the note deletion is removed from the deleter, which is how the fix was proven. |
 | CV-03 frontend | **Not implemented** (out of scope) |
 | CV-04 independent QA | **Not claimed as complete** (separate team deliverable) |
 

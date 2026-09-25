@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,4 +28,8 @@ public interface JpaPrescriptionReconciliationNoteRepository
             """)
     List<PrescriptionReconciliationNoteCountProjection> countByPrescriptionIdIn(
             @Param("prescriptionIds") Collection<UUID> prescriptionIds);
+
+    @Modifying
+    @Query("delete from PrescriptionReconciliationNoteEntity note where note.prescriptionId in :prescriptionIds")
+    void deleteByPrescriptionIdIn(@Param("prescriptionIds") Collection<UUID> prescriptionIds);
 }

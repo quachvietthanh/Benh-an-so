@@ -69,6 +69,10 @@ public class RecordPrescriptionReconciliationNoteService
         // Discrepancy type is always computed from persisted state. The client never supplies it.
         PrescriptionReconciliationOutcome outcome = PrescriptionReconciliationClassifier.classify(
                 prescription.getStatus(), prescription.getInterconnectionStatus());
+        if (!outcome.isDiscrepancy()) {
+            throw new ValidationException(
+                    "A reconciliation note can only be recorded for a discrepancy outcome.");
+        }
 
         Instant now = clockPort.now();
         PrescriptionReconciliationNote saved = noteRepository.save(

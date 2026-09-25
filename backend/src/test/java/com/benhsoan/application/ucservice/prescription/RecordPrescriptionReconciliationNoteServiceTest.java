@@ -111,18 +111,77 @@ class RecordPrescriptionReconciliationNoteServiceTest {
     }
 
     @Test
-    void cancellationStateIsStoredAsCancelledOutcome() {
+    void transmittedNotDispensedOutcomeIsAllowed() {
         UUID prescriptionId = UUID.randomUUID();
         when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(
-                prescription(prescriptionId, PrescriptionStatus.CANCELLED, InterconnectionStatus.NOT_SENT)));
+                prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, InterconnectionStatus.SUCCESS)));
         when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
         when(clockPort.now()).thenReturn(NOW);
         when(noteRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         PrescriptionReconciliationNoteResult result = service.record(
-                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Don da huy"));
+                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Cho cap phat"));
 
-        assertEquals(PrescriptionReconciliationOutcome.CANCELLED, result.reconciliationOutcome());
+        assertEquals(PrescriptionReconciliationOutcome.TRANSMITTED_NOT_DISPENSED,
+                result.reconciliationOutcome());
+    }
+
+    @Test
+    void dispensedNotTransmittedOutcomeIsAllowed() {
+        UUID prescriptionId = UUID.randomUUID();
+        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(
+                prescription(prescriptionId, PrescriptionStatus.PARTIALLY_DISPENSED, InterconnectionStatus.NOT_SENT)));
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+        when(clockPort.now()).thenReturn(NOW);
+        when(noteRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PrescriptionReconciliationNoteResult result = service.record(
+                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Da xu ly thu cong"));
+
+        assertEquals(PrescriptionReconciliationOutcome.DISPENSED_NOT_TRANSMITTED,
+                result.reconciliationOutcome());
+    }
+
+    @Test
+    void consistentOutcomeIsRejectedWithoutPersistingOrAuditing() {
+        UUID prescriptionId = UUID.randomUUID();
+        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(
+                prescription(prescriptionId, PrescriptionStatus.DISPENSED, InterconnectionStatus.SUCCESS)));
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        assertThrows(ValidationException.class, () -> service.record(
+                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Don khop")));
+
+        verify(noteRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelledOutcomeIsRejectedWithoutPersistingOrAuditing() {
+        UUID prescriptionId = UUID.randomUUID();
+        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(
+                prescription(prescriptionId, PrescriptionStatus.CANCELLED, InterconnectionStatus.NOT_SENT)));
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        assertThrows(ValidationException.class, () -> service.record(
+                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Don da huy")));
+
+        verify(noteRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    void notTransmittedAndNotDispensedOutcomeIsRejected() {
+        UUID prescriptionId = UUID.randomUUID();
+        when(prescriptionRepository.findById(prescriptionId)).thenReturn(Optional.of(
+                prescription(prescriptionId, PrescriptionStatus.PENDING_DISPENSE, InterconnectionStatus.FAILED)));
+        when(currentUserPort.getCurrentUserId()).thenReturn(UUID.randomUUID());
+
+        assertThrows(ValidationException.class, () -> service.record(
+                new RecordPrescriptionReconciliationNoteCommand(prescriptionId, "Chua lien thong")));
+
+        verify(noteRepository, never()).save(any());
+        verify(auditLogRepository, never()).save(any());
     }
 
     @Test

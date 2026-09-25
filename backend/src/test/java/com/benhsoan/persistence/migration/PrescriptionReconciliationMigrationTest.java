@@ -1,12 +1,15 @@
 package com.benhsoan.persistence.migration;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,11 +25,11 @@ import org.junit.jupiter.api.Test;
  * Comments are stripped before asserting so the migration header may still document the
  * constraint it is honouring without tripping the guard.
  */
-@DisplayName("V101 reconciliation migration - locked authorization rules")
+@DisplayName("V102 reconciliation migration - locked authorization rules")
 class PrescriptionReconciliationMigrationTest {
 
     private static final Path MIGRATION = Path.of(
-            "src/main/resources/db/migration/V101__create_prescription_reconciliation_schema.sql");
+            "src/main/resources/db/migration/V102__create_prescription_reconciliation_schema.sql");
 
     private String executableSql() throws IOException {
         return Files.readString(MIGRATION).lines()
@@ -75,5 +78,22 @@ class PrescriptionReconciliationMigrationTest {
         assertFalse(sql.contains("CREATE TABLE prescription_dispense_items"));
         assertFalse(sql.contains("CREATE TABLE audit_logs"));
         assertFalse(sql.contains("CREATE TABLE prescriptions"));
+    }
+
+    /**
+     * Guards the P0 defect this story hit twice: version 101 was taken by
+     * {@code add_guardian_link_review_notifications} on develop, which made Flyway fail with
+     * "Found more than one migration with version 101". The schema must own exactly one version.
+     */
+    @Test
+    void versionIsUniqueAcrossTheMigrationDirectory() throws IOException {
+        try (Stream<Path> files = Files.list(MIGRATION.getParent())) {
+            List<String> version102 = files.map(path -> path.getFileName().toString())
+                    .filter(name -> name.startsWith("V102__"))
+                    .toList();
+            assertEquals(1, version102.size(),
+                    "expected exactly one V102 migration but found: " + version102);
+            assertTrue(version102.get(0).contains("prescription_reconciliation"));
+        }
     }
 }

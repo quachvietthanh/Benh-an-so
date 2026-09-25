@@ -1,5 +1,5 @@
 -- =====================================================
--- V101__create_prescription_reconciliation_schema.sql
+-- V102__create_prescription_reconciliation_schema.sql
 -- NCL-12-CN-007: Doi chieu don da lien thong voi don da cap phat.
 --
 -- Adds exactly two reconciliation permissions and the append only reconciliation
@@ -42,8 +42,9 @@ WHERE roles.name IN ('ADMIN', 'PHARMACIST')
         AND role_permissions.permission_id = permissions.id
   );
 
--- Append only notes. No cascade delete on purpose: a written reconciliation reason
--- must remain readable independently of any later prescription maintenance.
+-- Append only notes. The prescription foreign key is intentionally NOT cascading, exactly
+-- like every other prescription child table: MedicalRecordCascadeDeleter removes these rows
+-- explicitly before deleting their prescriptions, so the delete order stays visible in code.
 CREATE TABLE prescription_reconciliation_notes (
     id BINARY(16) NOT NULL,
     prescription_id BINARY(16) NOT NULL,
