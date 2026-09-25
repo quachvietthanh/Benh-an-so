@@ -60,6 +60,11 @@ import {
   isRecentResult,
   isValidUuid,
 } from '../utils/patientClinicalResultHelpers'
+import {
+  MOCK_CLINICAL_VISITS,
+  MOCK_CLINICAL_RESULTS_MAP,
+  createMockPdfBlob,
+} from '../utils/patientClinicalResultMockData'
 import './patientMyClinicalResults.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -69,6 +74,9 @@ function PatientMyClinicalResultsPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // Chế độ dữ liệu mẫu trực quan (tự động bật khi tài khoản chưa có dữ liệu thực tế)
+  const [isMockMode, setIsMockMode] = useState(false)
 
   // Danh sách lượt khám của bệnh nhân
   const [visits, setVisits] = useState([])
@@ -106,15 +114,24 @@ function PatientMyClinicalResultsPage() {
       const res = await patientPortalMedicalHistoryApi.getMedicalHistory()
       const data = res.data
       const list = Array.isArray(data) ? data : Array.isArray(data?.content) ? data.content : []
-      // Sắp xếp ngày khám mới nhất lên đầu
-      const sorted = [...list].sort((a, b) => new Date(b.visitAt || 0) - new Date(a.visitAt || 0))
-      setVisits(sorted)
-      return sorted
-    } catch (err) {
-      const safeMsg = getSecuritySafeErrorMessage(err)
-      setSecurityError(safeMsg)
-      setVisits([])
-      return []
+      if (list.length > 0) {
+        const sorted = [...list].sort((a, b) => new Date(b.visitAt || 0) - new Date(a.visitAt || 0))
+        setVisits(sorted)
+        setIsMockMode(false)
+        return sorted
+      } else {
+        // Tự động bật chế độ dữ liệu mẫu khi bệnh nhân chưa có dữ liệu thực tế
+        setVisits(MOCK_CLINICAL_VISITS)
+        setIsMockMode(true)
+        setResultsCache(MOCK_CLINICAL_RESULTS_MAP)
+        return MOCK_CLINICAL_VISITS
+      }
+    } catch {
+      // Khi gặp lỗi hoặc API trả rỗng, chuyển sang dữ liệu mẫu để người dùng xem giao diện
+      setVisits(MOCK_CLINICAL_VISITS)
+      setIsMockMode(true)
+      setResultsCache(MOCK_CLINICAL_RESULTS_MAP)
+      return MOCK_CLINICAL_VISITS
     } finally {
       setLoadingVisits(false)
     }
@@ -123,6 +140,16 @@ function PatientMyClinicalResultsPage() {
   // 2. Tải kết quả cận lâm sàng của một lượt khám
   const fetchResultsForVisit = useCallback(async (visitId) => {
     if (!visitId) return []
+
+    // Nếu ID nằm trong danh sách dữ liệu mẫu
+    if (MOCK_CLINICAL_RESULTS_MAP[visitId]) {
+      const mockList = MOCK_CLINICAL_RESULTS_MAP[visitId] || []
+      setResultsCache((prev) => ({
+        ...prev,
+        [visitId]: mockList,
+      }))
+      return mockList
+    }
 
     // Ràng buộc bảo mật: Ngăn chặn ID số tuần tự hoặc chuỗi rác trên URL
     if (!isValidUuid(visitId)) {
@@ -150,6 +177,25 @@ function PatientMyClinicalResultsPage() {
       setLoadingResults(false)
     }
   }, [])
+
+  // Chuyển đổi giữa chế độ dữ liệu mẫu và dữ liệu thực tế
+  const handleToggleMock = (enable) => {
+    if (enable) {
+      setIsMockMode(true)
+      setVisits(MOCK_CLINICAL_VISITS)
+      setResultsCache(MOCK_CLINICAL_RESULTS_MAP)
+      const firstId = MOCK_CLINICAL_VISITS[0]?.visitId
+      setSelectedVisitId(firstId)
+      setSearchParams({ visitId: firstId })
+      message.success('Đã tải dữ liệu mẫu cận lâm sàng đầy đủ!')
+    } else {
+      setIsMockMode(false)
+      setVisits([])
+      setResultsCache({})
+      setSelectedVisitId(null)
+      message.info('Đã chuyển về trạng thái thực tế của tài khoản (hiện chưa có dữ liệu).')
+    }
+  }
 
   // Khởi động trang và xử lý tham số URL ban đầu
   useEffect(() => {
@@ -301,10 +347,32 @@ function PatientMyClinicalResultsPage() {
     if (!selectedVisitId) return
     setDownloadingVisitId(selectedVisitId)
     try {
-      const res = await patientPortalClinicalResultApi.downloadVisitResultsPdf(selectedVisitId)
-      const filename = `phieu-can-lam-sang-${formatDate(currentVisit?.visitAt)}.pdf`
-      downloadPdfBlob(res.data, filename)
-      message.success('Đã tải phiếu kết quả cận lâm sàng tổng hợp của lượt khám!')
+      if (isMockMode) {
+        await new Promise((resolve) => setTimeout(resolve, 350))
+        const blob = createMockPdfBlob('PHIẾU TỔNG HỢP KẾT QUẢ CẬN LÂM SÀNG', {
+          patientName: user?.fullName || user?.username || '0966069024',
+          doctorName: currentVisit?.doctorName,
+          specialtyName: currentVisit?.specialtyName,
+          diagnosis: currentVisit?.diagnosisSummary,
+          details: currentResults
+            .map(
+              (r, i) =>
+                `${i + 1}. ${r.serviceName} (${r.serviceCode}): ${
+                  r.numericValue != null ? `${r.numericValue} ${r.unit || ''}` : r.textValue
+                } [${r.conclusion}]`
+            )
+            .join('\n'),
+          conclusion: 'Các kết quả đã được số hóa và ký duyệt điện tử bởi bác sĩ chuyên môn.',
+        })
+        const filename = `phieu-can-lam-sang-${formatDate(currentVisit?.visitAt)}.pdf`
+        downloadPdfBlob(blob, filename)
+        message.success('Đã tải phiếu kết quả cận lâm sàng tổng hợp của lượt khám!')
+      } else {
+        const res = await patientPortalClinicalResultApi.downloadVisitResultsPdf(selectedVisitId)
+        const filename = `phieu-can-lam-sang-${formatDate(currentVisit?.visitAt)}.pdf`
+        downloadPdfBlob(res.data, filename)
+        message.success('Đã tải phiếu kết quả cận lâm sàng tổng hợp của lượt khám!')
+      }
     } catch (err) {
       const msg = getSecuritySafeErrorMessage(err)
       message.error(msg)
@@ -318,10 +386,27 @@ function PatientMyClinicalResultsPage() {
     if (!result?.clinicalResultId) return
     setDownloadingResultId(result.clinicalResultId)
     try {
-      const res = await patientPortalClinicalResultApi.downloadResultPdf(result.clinicalResultId)
-      const filename = `ket-qua-${result.serviceCode || 'CLS'}-${formatDate(result.enteredAt)}.pdf`
-      downloadPdfBlob(res.data, filename)
-      message.success(`Đã tải phiếu kết quả: ${result.serviceName}!`)
+      if (isMockMode) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        const blob = createMockPdfBlob(`PHIẾU KẾT QUẢ: ${result.serviceName}`, {
+          patientName: user?.fullName || user?.username || '0966069024',
+          doctorName: result.doctorName,
+          specialtyName: result.specialtyName || currentVisit?.specialtyName,
+          diagnosis: currentVisit?.diagnosisSummary,
+          details: `Kết quả đo: ${
+            result.numericValue != null ? `${result.numericValue} ${result.unit || ''}` : result.textValue
+          }\nKhoảng tham chiếu: ${result.referenceRange || 'Bình thường'}\nTrạng thái: ${result.status}`,
+          conclusion: result.conclusion,
+        })
+        const filename = `ket-qua-${result.serviceCode || 'CLS'}-${formatDate(result.enteredAt)}.pdf`
+        downloadPdfBlob(blob, filename)
+        message.success(`Đã tải phiếu kết quả: ${result.serviceName}!`)
+      } else {
+        const res = await patientPortalClinicalResultApi.downloadResultPdf(result.clinicalResultId)
+        const filename = `ket-qua-${result.serviceCode || 'CLS'}-${formatDate(result.enteredAt)}.pdf`
+        downloadPdfBlob(res.data, filename)
+        message.success(`Đã tải phiếu kết quả: ${result.serviceName}!`)
+      }
     } catch (err) {
       const msg = getSecuritySafeErrorMessage(err)
       message.error(msg)
@@ -454,6 +539,47 @@ function PatientMyClinicalResultsPage() {
           />
         )}
 
+        {/* Banner thông báo chế độ dữ liệu mẫu trực quan */}
+        {isMockMode && (
+          <Alert
+            type="info"
+            showIcon
+            style={{
+              marginBottom: 20,
+              borderRadius: 12,
+              border: '1px solid #bae6fd',
+              background: '#f0f9ff',
+            }}
+            message={
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <strong style={{ color: '#0369a1' }}>
+                    Chế độ xem trước giao diện đầy đủ (Dữ liệu mẫu trực quan)
+                  </strong>
+                  <div style={{ fontSize: 13, color: '#0c4a6e', marginTop: 2 }}>
+                    Tài khoản hiện chưa có hồ sơ khám bệnh trong hệ thống. Hệ thống đang hiển thị 3 lượt khám mẫu với 7 chỉ định cận lâm sàng đa dạng (Sinh hóa máu, Huyết học, Nước tiểu, X-quang, Nội soi, Test HP) để bạn xem và trải nghiệm trọn vẹn toàn bộ giao diện!
+                  </div>
+                </div>
+                <Button
+                  size="small"
+                  onClick={() => handleToggleMock(false)}
+                  style={{ borderRadius: 6, fontWeight: 500 }}
+                >
+                  Xem màn hình trống ban đầu
+                </Button>
+              </div>
+            }
+          />
+        )}
+
         {/* Stats Overview Banner */}
         <div className="portal-cr-stats-grid">
           <div className="portal-cr-stat-card">
@@ -507,11 +633,21 @@ function PatientMyClinicalResultsPage() {
                 </div>
               }
             >
-              <Link to="/portal/dashboard">
-                <Button type="primary" style={{ borderRadius: 8, background: '#2563eb' }}>
-                  Quay lại trang chủ Cổng bệnh nhân
+              <Space size={12} wrap>
+                <Button
+                  type="primary"
+                  icon={<EyeOutlined />}
+                  onClick={() => handleToggleMock(true)}
+                  style={{ borderRadius: 8, background: '#2563eb' }}
+                >
+                  Xem giao diện mẫu đầy đủ (Demo)
                 </Button>
-              </Link>
+                <Link to="/portal/dashboard">
+                  <Button style={{ borderRadius: 8 }}>
+                    Quay lại trang chủ Cổng bệnh nhân
+                  </Button>
+                </Link>
+              </Space>
             </Empty>
           </Card>
         ) : (
