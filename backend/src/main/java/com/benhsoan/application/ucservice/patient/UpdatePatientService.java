@@ -460,6 +460,15 @@ public class UpdatePatientService
     }
 
     private UUID validateGuardianUser(Patient patient, UUID guardianUserId) {
+        // QTN-44: a guardian link is only meaningful for a minor. Reject an adult target before
+        // any other check, and reuse the canonical patient lifecycle/age policy.
+        if (!patient.isMinor()) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Chỉ hồ sơ bệnh nhân chưa thành niên mới được gán người giám hộ (QTN-44)."
+            );
+        }
+
         if (guardianUserId.equals(patient.getUserId())) {
             throw new ValidationException(
                     "guardianUserId",
@@ -490,13 +499,16 @@ public class UpdatePatientService
             );
         }
 
-        // Cycle guard (1 level): a dependent may not be the guardian of its own guardian,
-        // which blocks A <-> B and the direct leg of A -> B -> C.
+        // Cycle guard (1 level, BR-06): the prospective guardian's portal account must not
+        // already be guarded by THIS patient's portal account. Both sides of the comparison are
+        // users.id values -- guardianUserId references users(id), and the patient's account is
+        // patient.getUserId(), never patient.getId(). Comparing the guardian's userId against
+        // the patient's patientId could never match and silently disabled this guard.
         Patient guardianProfile = patientRepository.findByUserId(guardianUserId).orElse(null);
 
         if (guardianProfile != null
                 && guardianProfile.getGuardianUserId() != null
-                && guardianProfile.getGuardianUserId().equals(patient.getId())) {
+                && guardianProfile.getGuardianUserId().equals(patient.getUserId())) {
             throw new ValidationException(
                     "guardianUserId",
                     "Không thể tạo liên kết giám hộ vòng giữa hai hồ sơ."

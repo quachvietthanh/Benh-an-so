@@ -23,4 +23,7 @@ public interface PatientPortalNotificationRepository {
 
     boolean existsByPatientIdAndTypeAndClinicalResultId(
             UUID patientId, PatientPortalNotificationType type, UUID clinicalResultId);
+
+    boolean existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+            UUID patientId, PatientPortalNotificationType type, UUID guardianReviewDependentPatientId);
 }

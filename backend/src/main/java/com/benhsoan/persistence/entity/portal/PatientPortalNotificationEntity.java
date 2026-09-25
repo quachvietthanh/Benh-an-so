@@ -55,4 +55,11 @@ public class PatientPortalNotificationEntity {
 
     @Column(name = "clinical_result_id", columnDefinition = "BINARY(16)")
     private UUID clinicalResultId;
+
+    /**
+     * NCL-14-CN-010 TC-03: idempotency key for GUARDIAN_LINK_REVIEW notifications; null for
+     * every other notification type.
+     */
+    @Column(name = "guardian_review_dependent_patient_id", columnDefinition = "BINARY(16)")
+    private UUID guardianReviewDependentPatientId;
 }

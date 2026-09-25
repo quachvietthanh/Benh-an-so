@@ -185,6 +185,12 @@ public class PatientBookAppointmentService implements PatientBookAppointmentUseC
                                 "No patient profile is linked to the authenticated user."))
                 : patientAccessGuard.requirePatientAccess(command.patientId());
 
+        // QTN-33: re-validate the target profile server-side regardless of how it was resolved,
+        // so a client cannot bypass the linked-profile list and book for an inactive or merged
+        // patient by submitting that patientId directly. Historical records are untouched; this
+        // guard only gates the creation of NEW appointments.
+        targetPatient.validateCanReceiveNewActivity();
+
         UUID patientId = targetPatient.getId();
         boolean bookingOnBehalfOfDependent = !userId.equals(targetPatient.getUserId());
 

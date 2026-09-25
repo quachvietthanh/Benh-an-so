@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.junit.jupiter.api.DisplayName;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.appointment.Appointment;
@@ -432,6 +433,76 @@ class PatientBookAppointmentServiceTest {
     // ------------------------------------------------------------------
     // NCL-14-CN-010: booking on behalf of a linked dependent patient
     // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("P2.2: khong dat lich cho ho so phu thuoc da bi gop (MERGED)")
+    void rejectsBookingForMergedDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+        UUID mergedIntoId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient merged = mock(Patient.class);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(merged);
+        // Domain lifecycle guard rejects merged profiles for NEW activity.
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientAlreadyMergedException(dependentId, mergedIntoId))
+                .when(merged).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientAlreadyMergedException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham nhi", dependentId)));
+
+        // Nothing is persisted or audited for a rejected target.
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+        verify(auditLogRepository, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P2.2: khong dat lich cho ho so phu thuoc da bi vo hieu hoa (INACTIVE)")
+    void rejectsBookingForInactiveDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient inactive = mock(Patient.class);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(inactive);
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientInactiveException())
+                .when(inactive).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientInactiveException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham nhi", dependentId)));
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+        verify(auditLogRepository, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P2.2: dat lich cho chinh minh cung bi chan khi ho so bi vo hieu hoa")
+    void rejectsOwnBookingWhenOwnProfileIsInactive() {
+        UUID userId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient ownInactive = mock(Patient.class);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(ownInactive));
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientInactiveException())
+                .when(ownInactive).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientInactiveException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham", null)));
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+    }
 
     @Test
     void booksAppointmentForLinkedDependentWithOnBehalfAuditContext() throws Exception {

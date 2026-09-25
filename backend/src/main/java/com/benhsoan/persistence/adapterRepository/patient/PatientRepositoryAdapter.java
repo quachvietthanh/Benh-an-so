@@ -108,8 +108,24 @@ public class PatientRepositoryAdapter implements PatientRepository {
     }
 
     @Override
-    public List<Patient> findAllByGuardianUserIdOrderByFullNameAsc(UUID guardianUserId) {
-        return jpaRepository.findAllByGuardianUserIdOrderByFullNameAsc(guardianUserId).stream()
+    public List<Patient> findValidDependentsByGuardianUserId(UUID guardianUserId) {
+        return jpaRepository.findValidDependentsByGuardianUserId(guardianUserId).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Optional<Patient> findValidDependentByGuardianUserIdAndId(
+            UUID guardianUserId,
+            UUID patientId
+    ) {
+        return jpaRepository.findValidDependentByGuardianUserIdAndId(guardianUserId, patientId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Patient> findGuardianLinkedProfiles() {
+        return jpaRepository.findGuardianLinkedProfiles().stream()
                 .map(mapper::toDomain)
                 .toList();
     }

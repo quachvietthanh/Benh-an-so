@@ -1,6 +1,7 @@
 package com.benhsoan.application.ucservice.patient;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,14 @@ import lombok.RequiredArgsConstructor;
  * own patient record plus patients whose {@code guardian_user_id} equals that account.
  * QTN-23 / QTN-44: only minors keep a guardian, so the relationship label is the persisted
  * {@code guardianRelationship}.
+ *
+ * <p>QTN-33: dependent discovery only returns valid profiles (active, not merged, and not
+ * deactivated). A merged or deactivated dependent must not be selectable for new booking; its
+ * historical appointment records are unaffected because they are read through other endpoints.</p>
+ *
+ * <p>The result is bounded: both the self profile and the dependent lookup are limited to
+ * {@link #MAX_LINKED_PROFILES} rows, ordered by full name with a deterministic patientId
+ * tie-breaker, so the endpoint never returns an unbounded database result set.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +37,13 @@ import lombok.RequiredArgsConstructor;
 public class GetPatientLinkedProfilesService implements GetPatientLinkedProfilesUseCase {
 
     static final String SELF_RELATIONSHIP = "SELF";
+
+    /**
+     * Maximum number of dependent profiles returned. This is a bounded-list endpoint (a portal
+     * account does not need hundreds of dependents) rather than a paginated one, matching the
+     * project's other bounded portal list conventions.
+     */
+    public static final int MAX_LINKED_PROFILES = 50;
 
     private final PatientRepository patientRepository;
 
@@ -39,11 +55,19 @@ public class GetPatientLinkedProfilesService implements GetPatientLinkedProfiles
 
         List<Patient> linked = new ArrayList<>();
 
-        patientRepository.findByUserId(userId).ifPresent(linked::add);
-        linked.addAll(patientRepository.findAllByGuardianUserIdOrderByFullNameAsc(userId));
+        patientRepository.findByUserId(userId)
+                .filter(Patient::isActive)
+                .filter(patient -> !patient.isMerged())
+                .ifPresent(linked::add);
+
+        linked.addAll(patientRepository.findValidDependentsByGuardianUserId(userId));
 
         return linked.stream()
                 .distinct()
+                .sorted(Comparator
+                        .comparing(Patient::getFullName, Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(Patient::getId))
+                .limit(MAX_LINKED_PROFILES)
                 .map(patient -> toResult(patient, !userId.equals(patient.getUserId())))
                 .toList();
     }
