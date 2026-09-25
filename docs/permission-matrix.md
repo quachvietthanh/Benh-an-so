@@ -145,8 +145,21 @@
 | `/patient-portal/appointments` | GET | ❌ | ❌ | ❌ | ✅ |
 | `/patient-portal/appointments` | POST | ❌ | ❌ | ❌ | ✅ |
 | `/patient-portal/appointments/{id}` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/satisfaction-surveys` | POST | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu lượt khám) |
+| `/patient-portal/satisfaction-surveys/{id}` | PUT | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu khảo sát) |
+| `/patient-portal/satisfaction-surveys/by-visit/{visitId}` | GET | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu lượt khám) |
 | `/patients/{patientId}` | PUT | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ❌ |
 *(Lưu ý: Các endpoint `/patient-portal/**` chỉ dành riêng cho vai trò `ROLE_PATIENT` với dữ liệu thuộc chính mình theo QTN-23)*
+
+**NCL-10-CN-005 — Khảo sát hài lòng sau khám**
+
+| Hạng mục | Chi tiết |
+|---|---|
+| Endpoints mới | `POST /patient-portal/satisfaction-surveys`, `PUT /patient-portal/satisfaction-surveys/{id}`, `GET /patient-portal/satisfaction-surveys/by-visit/{visitId}`, `GET /reports/satisfaction` |
+| Quyền mới | Không thêm permission code mới. Phân hệ báo cáo sử dụng permission `REPORT_VIEW` (đã được cấp cho `ROLE_MANAGER` và `ROLE_ADMIN`). |
+| Phân quyền vận chuyển | `/patient-portal/**` = `hasRole("PATIENT")`; `/reports/**` = `authenticated()` + `@RequirePermission("REPORT_VIEW")`. |
+| Chống gửi trùng | Ràng buộc duy nhất `visit_id` trên DB, chặn tạo mới trả về `409 CONFLICT` (`SATISFACTION_SURVEY_ALREADY_EXISTS`), cho phép chỉnh sửa qua `PUT`. |
+| Phạm vi dữ liệu (Data Scope) | `PatientAccessGuard.requirePatientOwnership(...)` bắt buộc bệnh nhân chỉ khảo sát và xem đánh giá của chính lượt khám của mình (`QTN-23`). |
 
 **NCL-14-CN-010 — Người giám hộ đặt lịch cho bệnh nhân phụ thuộc**
 
@@ -160,6 +173,12 @@
 | Gán `guardianUserId` | Chỉ `PUT /patients/{patientId}` với `PATIENT_UPDATE`. Vai trò `PATIENT` có **0 permission grant** (`V27__seed_patient_portal_role.sql`) nên không thể tự gán người giám hộ. |
 
 Chi tiết: `docs/api/patient-portal-family-appointment-contract.md`, `docs/security-review-ncl-14-cn-010.md`.
+|  |  |  |  |  |  |
+| **Reports** |  |  |  |  |  |
+| `/reports/summary` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/visits-timeline` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/top-medicines` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/satisfaction` | GET | ✅ | ❌ (Chỉ ROLE_MANAGER/ADMIN có `REPORT_VIEW`) | ❌ | ❌ |
 |  |  |  |  |  |  |
 | **Admin / System** |  |  |  |  |  |
 | `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |
