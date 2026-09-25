@@ -382,13 +382,14 @@ count query carries **no** display joins, because a left join on a primary key c
    migration — this follows the existing convention (`chk_prescription_interconnection_logs_type`).
 7. **Notification on discrepancy is not implemented.** The workbook does not require notifying
    anyone when a discrepancy is found at reconciliation time, so no email/SMS/push path was added.
-8. **The same non-cascading foreign key on `prescription_interconnection_logs` (V21) is still not
-   handled.** `MedicalRecordCascadeDeleter` removes the reconciliation notes, but it still does not
-   remove interconnection logs, so deleting a medical record that has a transmitted prescription
-   remains broken on a foreign-key-enforcing database. This is a pre-existing **NCL-12-CN-004**
-   defect, unrelated to NCL-12-CN-007, and was deliberately left untouched by this task. The minimal
-   fix is one `deleteByPrescriptionIdIn` on `JpaPrescriptionInterconnectionLogRepository` plus one
-   line in the deleter, mirroring the reconciliation-note fix.
+8. **`prescription_interconnection_logs` FK deletion — resolved.** A pre-existing **NCL-12-CN-004**
+   defect was discovered during this feature: `MedicalRecordCascadeDeleter` removed the
+   reconciliation notes but not the interconnection logs, so deleting a medical record that had a
+   transmitted prescription remained broken on a foreign-key-enforcing database. The minimal fix —
+   a `deleteByPrescriptionIdIn` on `JpaPrescriptionInterconnectionLogRepository` plus one line in the
+   deleter, mirroring the reconciliation-note fix — was applied here because it is small, isolated
+   and does not change NCL-12-CN-004 business behaviour. The non-cascading FK is intentionally
+   preserved, exactly like every other prescription child table.
 
 ---
 
@@ -401,6 +402,7 @@ count query carries **no** display joins, because a left join on a primary key c
 | Full backend suite | **Executed** — 3377 tests, 5 failures, 6 errors, 55 skipped. All failing classes are pre-existing and unrelated: `ContraindicationRuleControllerTest` (3), `DoctorWeeklyTableControllerTest` (5) — documented before this task; `PatientImportEdgeCasesTest` (1) and `ExcelPatientSheetParserTest` (1, `NoClassDefFoundError`) — **re-verified to fail identically with this task's changes stashed**, in the patient-Excel-import area; `LoginAttemptConcurrencyIntegrationTest` is order-dependent and passes in isolation. None of them touches reconciliation, notes, prescriptions or medical-record deletion. |
 | MySQL migration (`V102`) applied by Flyway on a real MySQL server | **Not executed** — no Docker daemon is available in this environment, so Testcontainers/MySQL suites are skipped and `V102`'s MySQL-specific SQL (for example `UUID_TO_BIN(UUID())`) remains unverified. `V102` follows the exact convention of its neighbours `V77`, `V79` and `V98`. H2 verifies the JPQL projection and the JPA mapping of the note entity (Flyway is disabled in H2 slice tests by project convention). |
 | Medical-record deletion with reconciliation notes present | **Executed on H2** — `MedicalRecordCascadeDeleterReconciliationNoteIntegrationTest` adds the real non-cascading foreign key and deletes a medical record that has prescriptions with notes. It fails with `Referential integrity constraint violation` when the note deletion is removed from the deleter, which is how the fix was proven. |
+| Medical-record deletion with interconnection logs present | **Executed on H2** — `MedicalRecordCascadeDeleterPrescriptionHistoryIntegrationTest` adds the real non-cascading foreign keys on both child tables and proves (1) a medical record whose prescriptions have interconnection logs deletes successfully, (2) unrelated medical records' logs/notes are kept, and (3) the deleter joins the caller's transaction. The pre-existing NCL-12-CN-004 FK defect is thereby closed. |
 | CV-03 frontend | **Not implemented** (out of scope) |
 | CV-04 independent QA | **Not claimed as complete** (separate team deliverable) |
 
