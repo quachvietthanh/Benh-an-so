@@ -58,7 +58,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitSummaryUseCase {
 
@@ -69,6 +68,7 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
     private final ClinicConfigurationRepository clinicConfigurationRepository;
+    private final com.benhsoan.port.outbound.repository.clinic.DocumentPrintTemplateRepository documentPrintTemplateRepository;
     private final MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository;
     private final ClinicalOrderRepository clinicalOrderRepository;
     private final ClinicalOrderItemRepository clinicalOrderItemRepository;
@@ -81,6 +81,73 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
     private final AnonymizationModeState anonymizationModeState;
     private final ObjectMapper objectMapper;
     private final VisitSummaryAuthorization visitSummaryAuthorization;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public VisitSummaryService(
+            VisitRepository visitRepository,
+            MedicalRecordRepository medicalRecordRepository,
+            PatientRepository patientRepository,
+            UserRepository userRepository,
+            ClinicConfigurationRepository clinicConfigurationRepository,
+            com.benhsoan.port.outbound.repository.clinic.DocumentPrintTemplateRepository documentPrintTemplateRepository,
+            MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository,
+            ClinicalOrderRepository clinicalOrderRepository,
+            ClinicalOrderItemRepository clinicalOrderItemRepository,
+            MedicalRecordAccessLogRepository accessLogRepository,
+            AuditLogRepository auditLogRepository,
+            MedicalRecordAccessAuditService accessAuditService,
+            VisitSummaryPdfRenderer pdfRenderer,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AnonymizationModeState anonymizationModeState,
+            ObjectMapper objectMapper,
+            VisitSummaryAuthorization visitSummaryAuthorization
+    ) {
+        this.visitRepository = visitRepository;
+        this.medicalRecordRepository = medicalRecordRepository;
+        this.patientRepository = patientRepository;
+        this.userRepository = userRepository;
+        this.clinicConfigurationRepository = clinicConfigurationRepository;
+        this.documentPrintTemplateRepository = documentPrintTemplateRepository;
+        this.medicalRecordDiagnosisRepository = medicalRecordDiagnosisRepository;
+        this.clinicalOrderRepository = clinicalOrderRepository;
+        this.clinicalOrderItemRepository = clinicalOrderItemRepository;
+        this.accessLogRepository = accessLogRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.accessAuditService = accessAuditService;
+        this.pdfRenderer = pdfRenderer;
+        this.currentUserPort = currentUserPort;
+        this.clockPort = clockPort;
+        this.anonymizationModeState = anonymizationModeState;
+        this.objectMapper = objectMapper;
+        this.visitSummaryAuthorization = visitSummaryAuthorization;
+    }
+
+    public VisitSummaryService(
+            VisitRepository visitRepository,
+            MedicalRecordRepository medicalRecordRepository,
+            PatientRepository patientRepository,
+            UserRepository userRepository,
+            ClinicConfigurationRepository clinicConfigurationRepository,
+            MedicalRecordDiagnosisRepository medicalRecordDiagnosisRepository,
+            ClinicalOrderRepository clinicalOrderRepository,
+            ClinicalOrderItemRepository clinicalOrderItemRepository,
+            MedicalRecordAccessLogRepository accessLogRepository,
+            AuditLogRepository auditLogRepository,
+            MedicalRecordAccessAuditService accessAuditService,
+            VisitSummaryPdfRenderer pdfRenderer,
+            CurrentUserPort currentUserPort,
+            ClockPort clockPort,
+            AnonymizationModeState anonymizationModeState,
+            ObjectMapper objectMapper,
+            VisitSummaryAuthorization visitSummaryAuthorization
+    ) {
+        this(visitRepository, medicalRecordRepository, patientRepository, userRepository,
+                clinicConfigurationRepository, null, medicalRecordDiagnosisRepository,
+                clinicalOrderRepository, clinicalOrderItemRepository, accessLogRepository,
+                auditLogRepository, accessAuditService, pdfRenderer, currentUserPort, clockPort,
+                anonymizationModeState, objectMapper, visitSummaryAuthorization);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -310,6 +377,16 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 ))
                 .toList();
 
+        var template = documentPrintTemplateRepository != null
+                ? documentPrintTemplateRepository.findByDocumentType(com.benhsoan.domain.clinic.enums.PrintDocumentType.VISIT_SUMMARY).orElse(null)
+                : null;
+        String title = template != null ? template.getTitle() : null;
+        String logoUrl = template != null ? template.getLogoUrl() : null;
+        String legalInfo = template != null ? template.getLegalInfo() : null;
+        String footerText = template != null ? template.getFooterText() : null;
+        boolean showLogo = template == null || template.isShowLogo();
+        String fieldVisibility = template != null ? template.getFieldVisibility() : null;
+
         return new VisitSummaryPrintDocument(
                 clinicName,
                 clinicAddress,
@@ -330,7 +407,13 @@ public class VisitSummaryService implements GetVisitSummaryUseCase, ExportVisitS
                 d.signedByName(),
                 d.record().getSignedAt(),
                 printedByName,
-                printedAt
+                printedAt,
+                title,
+                logoUrl,
+                legalInfo,
+                footerText,
+                showLogo,
+                fieldVisibility
         );
     }
 
