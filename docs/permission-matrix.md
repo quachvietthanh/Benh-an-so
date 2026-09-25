@@ -71,6 +71,9 @@
 | `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ |
 | `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescription-reconciliation` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/prescription-reconciliation/{prescriptionId}/notes` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/prescription-reconciliation/{prescriptionId}/notes` | POST | ✅ | ❌ | ❌ | ✅ |
 | `/api/v1/prescriptions/check-interactions` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/prescriptions/check-allergy-warnings` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/prescriptions/allergy-warning-logs` | GET | ✅ | ❌ | ❌ | ❌ |
@@ -220,6 +223,7 @@ RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS, 
 // Prescription
 PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS, PRESCRIPTION_PRINT,
 PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTION_INTERCONNECTION_RETRY,
+PRESCRIPTION_RECONCILIATION_VIEW, PRESCRIPTION_RECONCILIATION_NOTE,
 PRESCRIPTION_ALLERGY_WARNING_VIEW
 
 // Appointment
