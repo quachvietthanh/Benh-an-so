@@ -1,0 +1,159 @@
+/* CSS cho màn hình Rút lại và Cập nhật phiếu đồng ý xử lý dữ liệu cá nhân (NCL-15-CN-005) */
+
+.patient-consent-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Card trạng thái hiện tại */
+.consent-current-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.consent-current-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.consent-scope-card-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+  margin-bottom: 10px;
+}
+
+.consent-scope-card-item:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.consent-scope-card-item.active {
+  border-left: 4px solid #16a34a;
+}
+
+.consent-scope-card-item.withdrawn {
+  border-left: 4px solid #dc2626;
+  opacity: 0.75;
+}
+
+/* Khung xem trước (Preview box) trước khi chốt lưu */
+.consent-preview-box {
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 16px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
+.consent-preview-section {
+  margin-bottom: 14px;
+}
+
+.consent-preview-section:last-child {
+  margin-bottom: 0;
+}
+
+.consent-preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.consent-preview-new-scopes {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #166534;
+}
+
+.consent-preview-stopped-activities {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #92400e;
+}
+
+.consent-preview-withdrawn-all {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #991b1b;
+}
+
+/* Danh sách lịch sử phiên bản (Version Timeline / Table) */
+.consent-history-item {
+  position: relative;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  background: #ffffff;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
+}
+
+.consent-history-item.is-current {
+  border: 2px solid #2563eb;
+  background: #f8faff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+.consent-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.consent-history-version-badge {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Hộp giải thích pháp lý QTN-19 */
+.qtn19-explainer-card {
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+  border: 1px solid #bfdbfe;
+  padding: 20px;
+}
+
+.qtn19-explainer-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e40af;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.qtn19-explainer-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #334155;
+}
