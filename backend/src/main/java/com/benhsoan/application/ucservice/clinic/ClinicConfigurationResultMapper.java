@@ -17,7 +17,8 @@ class ClinicConfigurationResultMapper {
                 configuration.getClosingTime(),
                 configuration.getRetentionYears(),
                 configuration.getSigningDeadlineHours(),
-                configuration.getActiveRecordDurationMonths()
+                configuration.getActiveRecordDurationMonths(),
+                configuration.getSessionIdleTimeoutMinutes()
         );
     }
 }

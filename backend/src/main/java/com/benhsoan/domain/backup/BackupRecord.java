@@ -32,6 +32,7 @@ public class BackupRecord {
     private Instant createdAt;
     private Instant restoredAt;
     private UUID restoredBy;
+    private String failureReason;
 
     private BackupRecord(
             UUID id,
@@ -44,7 +45,8 @@ public class BackupRecord {
             UUID createdBy,
             Instant createdAt,
             Instant restoredAt,
-            UUID restoredBy
+            UUID restoredBy,
+            String failureReason
     ) {
         this.id = Guard.require(id, "Backup id");
         this.backupCode = Guard.require(backupCode, "Backup code");
@@ -57,6 +59,7 @@ public class BackupRecord {
         this.description = description;
         this.restoredAt = restoredAt;
         this.restoredBy = restoredBy;
+        this.failureReason = failureReason;
     }
 
     public static BackupRecord create(
@@ -77,6 +80,7 @@ public class BackupRecord {
                 createdBy,
                 createdAt,
                 null,
+                null,
                 null
         );
     }
@@ -94,6 +98,36 @@ public class BackupRecord {
             Instant restoredAt,
             UUID restoredBy
     ) {
+        return restore(
+                id,
+                backupCode,
+                fileName,
+                fileSize,
+                status,
+                backupType,
+                description,
+                createdBy,
+                createdAt,
+                restoredAt,
+                restoredBy,
+                null
+        );
+    }
+
+    public static BackupRecord restore(
+            UUID id,
+            String backupCode,
+            String fileName,
+            long fileSize,
+            BackupStatus status,
+            BackupType backupType,
+            String description,
+            UUID createdBy,
+            Instant createdAt,
+            Instant restoredAt,
+            UUID restoredBy,
+            String failureReason
+    ) {
         return new BackupRecord(
                 id,
                 backupCode,
@@ -105,7 +139,8 @@ public class BackupRecord {
                 createdBy,
                 createdAt,
                 restoredAt,
-                restoredBy
+                restoredBy,
+                failureReason
         );
     }
 
@@ -119,13 +154,19 @@ public class BackupRecord {
         }
         this.fileSize = fileSize;
         this.status = BackupStatus.SUCCESS;
+        this.failureReason = null;
     }
 
     public void markFailed() {
+        markFailed(null);
+    }
+
+    public void markFailed(String failureReason) {
         if (status != BackupStatus.IN_PROGRESS) {
             throw new InvalidBackupStatusException("Only in-progress backups can be marked failed.");
         }
         this.status = BackupStatus.FAILED;
+        this.failureReason = failureReason;
     }
 
     public void markRestored(UUID restoredBy, Instant restoredAt) {

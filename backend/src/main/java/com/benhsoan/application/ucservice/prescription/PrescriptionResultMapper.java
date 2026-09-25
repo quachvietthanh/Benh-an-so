@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
 import com.benhsoan.port.dto.result.PrescriptionItemResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.dto.result.PrescriptionWarningResult;
@@ -23,28 +24,59 @@ public class PrescriptionResultMapper {
             Prescription prescription,
             List<PrescriptionWarningLog> warningLogs
     ) {
+        return toResult(prescription, warningLogs, List.of());
+    }
+
+    public PrescriptionResult toResult(
+            Prescription prescription,
+            List<PrescriptionWarningLog> warningLogs,
+            List<MaxDailyDoseMissingDataResult> maxDailyDoseMissingData
+    ) {
         List<PrescriptionWarningLog> safeWarningLogs = warningLogs == null
                 ? List.of()
                 : warningLogs;
+        List<MaxDailyDoseMissingDataResult> safeMissingData = maxDailyDoseMissingData == null
+                ? List.of()
+                : maxDailyDoseMissingData;
         var displayContext = displayContextResolver.resolve(
                 prescription.getMedicalRecordId(),
                 prescription.getPrescribedBy()
         );
 
+        return toResult(prescription, safeWarningLogs, safeMissingData, displayContext);
+    }
+
+    public PrescriptionResult toResult(
+            Prescription prescription,
+            List<PrescriptionWarningLog> warningLogs,
+            List<MaxDailyDoseMissingDataResult> maxDailyDoseMissingData,
+            PrescriptionDisplayContextResolver.PrescriptionDisplayContext displayContext
+    ) {
+        List<PrescriptionWarningLog> safeWarningLogs = warningLogs == null
+                ? List.of()
+                : warningLogs;
+        List<MaxDailyDoseMissingDataResult> safeMissingData = maxDailyDoseMissingData == null
+                ? List.of()
+                : maxDailyDoseMissingData;
+        var effectiveContext = displayContext == null
+                ? new PrescriptionDisplayContextResolver.PrescriptionDisplayContext(
+                        null, null, null, null, null, null)
+                : displayContext;
+
         return new PrescriptionResult(
                 prescription.getId(),
                 prescription.getPrescriptionCode(),
                 prescription.getMedicalRecordId(),
-                displayContext.visitId(),
-                displayContext.visitCode(),
-                displayContext.patientId(),
-                displayContext.patientCode(),
-                displayContext.patientName(),
+                effectiveContext.visitId(),
+                effectiveContext.visitCode(),
+                effectiveContext.patientId(),
+                effectiveContext.patientCode(),
+                effectiveContext.patientName(),
                 prescription.getStatus(),
                 prescription.getNote(),
                 prescription.getCancelReason(),
                 prescription.getPrescribedBy(),
-                displayContext.doctorName(),
+                effectiveContext.doctorName(),
                 prescription.getPrescribedAt(),
                 prescription.getUpdatedBy(),
                 prescription.getUpdatedAt(),
@@ -55,7 +87,8 @@ public class PrescriptionResultMapper {
                 safeWarningLogs
                         .stream()
                         .map(this::toWarningResult)
-                        .toList()
+                        .toList(),
+                safeMissingData
         );
     }
 
@@ -78,6 +111,7 @@ public class PrescriptionResultMapper {
                 item.getDispensedQuantity(),
                 item.getRemainingQuantity(),
                 item.getInstructions(),
+                item.getSingleDoseQuantity(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );

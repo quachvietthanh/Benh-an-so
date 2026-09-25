@@ -10,6 +10,7 @@ import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionI
 import com.benhsoan.adapter.inbound.rest.request.prescription.AmendPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CancelPrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CheckDrugInteractionRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.CheckMaxDailyDoseRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionItemRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.CreatePrescriptionRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.DispenseItemRequest;
@@ -40,6 +41,8 @@ import com.benhsoan.port.dto.command.prescription.AmendPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.CancelPrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
+import com.benhsoan.port.dto.command.prescription.CheckMaxDailyDoseCommand;
+import com.benhsoan.port.dto.command.prescription.CheckMaxDailyDoseItemCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.DispenseItemCommand;
@@ -68,11 +71,19 @@ import com.benhsoan.port.dto.result.ReturnedMedicationItemResult;
 
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionAllergyOverrideRequest;
 import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionContraindicationOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.request.prescription.PrescriptionMaxDailyDoseOverrideRequest;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseMissingDataResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseCheckResponse;
+import com.benhsoan.adapter.inbound.rest.response.prescription.MaxDailyDoseWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PatientAllergyWarningResponse;
 import com.benhsoan.adapter.inbound.rest.response.prescription.PrescriptionAllergyWarningLogResponse;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionContraindicationOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseCheckResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionAllergyWarningLogResult;
 
 @Component
@@ -105,6 +116,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides
+                = request.maxDailyDoseOverrides() == null
+                        ? List.of()
+                        : request.maxDailyDoseOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return AmendPrescriptionCommand.builder()
                 .prescriptionId(prescriptionId)
                 .note(request.note())
@@ -115,6 +134,7 @@ public class PrescriptionRestMapper {
                         .toList())
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
+                .maxDailyDoseOverrides(maxDailyDoseOverrides)
                 .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
@@ -146,6 +166,14 @@ public class PrescriptionRestMapper {
                                 .map(this::toCommand)
                                 .toList();
 
+        List<PrescriptionMaxDailyDoseOverrideCommand> maxDailyDoseOverrides
+                = request.maxDailyDoseOverrides() == null
+                        ? List.of()
+                        : request.maxDailyDoseOverrides()
+                                .stream()
+                                .map(this::toCommand)
+                                .toList();
+
         return CreatePrescriptionCommand.builder()
                 .medicalRecordId(request.medicalRecordId())
                 .note(request.note())
@@ -156,6 +184,7 @@ public class PrescriptionRestMapper {
                 .interactionOverrides(interactionOverrides)
                 .allergyOverrides(allergyOverrides)
                 .contraindicationOverrides(contraindicationOverrides)
+                .maxDailyDoseOverrides(maxDailyDoseOverrides)
                 .controlledMedicineConfirmed(request.controlledMedicineConfirmed())
                 .build();
     }
@@ -204,6 +233,12 @@ public class PrescriptionRestMapper {
                         .stream()
                         .map(this::toResponse)
                         .toList())
+                .maxDailyDoseMissingData(result.maxDailyDoseMissingData() == null
+                        ? List.of()
+                        : result.maxDailyDoseMissingData()
+                                .stream()
+                                .map(this::toResponse)
+                                .toList())
                 .build();
     }
 
@@ -323,6 +358,7 @@ public class PrescriptionRestMapper {
                 .durationDays(request.durationDays())
                 .quantity(request.quantity())
                 .instructions(request.instructions())
+                .singleDoseQuantity(request.singleDoseQuantity())
                 .build();
     }
 
@@ -337,6 +373,7 @@ public class PrescriptionRestMapper {
                 .durationDays(request.durationDays())
                 .quantity(request.quantity())
                 .instructions(request.instructions())
+                .singleDoseQuantity(request.singleDoseQuantity())
                 .build();
     }
 
@@ -368,6 +405,7 @@ public class PrescriptionRestMapper {
                 .dispensedQuantity(result.dispensedQuantity())
                 .remainingQuantity(result.remainingQuantity())
                 .instructions(result.instructions())
+                .singleDoseQuantity(result.singleDoseQuantity())
                 .createdAt(result.createdAt())
                 .updatedAt(result.updatedAt())
                 .build();
@@ -442,6 +480,18 @@ public class PrescriptionRestMapper {
         return new PrescriptionContraindicationOverrideCommand(
                 request.ruleId(),
                 request.medicineId(),
+                request.overrideReason()
+        );
+    }
+
+    public PrescriptionMaxDailyDoseOverrideCommand toCommand(
+            PrescriptionMaxDailyDoseOverrideRequest request
+    ) {
+        if (request == null) {
+            return null;
+        }
+        return new PrescriptionMaxDailyDoseOverrideCommand(
+                request.activeIngredient(),
                 request.overrideReason()
         );
     }
@@ -563,6 +613,41 @@ public class PrescriptionRestMapper {
                 result.medicineName(),
                 result.type(),
                 result.message()
+        );
+    }
+
+    private MaxDailyDoseMissingDataResponse toResponse(MaxDailyDoseMissingDataResult result) {
+        return new MaxDailyDoseMissingDataResponse(
+                result.activeIngredient(),
+                result.reason()
+        );
+    }
+
+    public CheckMaxDailyDoseCommand toCommand(CheckMaxDailyDoseRequest request) {
+        return new CheckMaxDailyDoseCommand(
+                request.medicalRecordId(),
+                request.items().stream()
+                        .map(item -> new CheckMaxDailyDoseItemCommand(
+                                item.medicineId(),
+                                item.singleDoseQuantity(),
+                                item.frequency()
+                        ))
+                        .toList()
+        );
+    }
+
+    public MaxDailyDoseCheckResponse toResponse(MaxDailyDoseCheckResult result) {
+        return new MaxDailyDoseCheckResponse(
+                result.warnings().stream().map(this::toResponse).toList(),
+                result.missingData().stream().map(this::toResponse).toList()
+        );
+    }
+
+    private MaxDailyDoseWarningResponse toResponse(MaxDailyDoseWarningResult result) {
+        return new MaxDailyDoseWarningResponse(
+                result.activeIngredient(),
+                result.totalDailyDoseMg(),
+                result.maxDailyDoseMg()
         );
     }
 

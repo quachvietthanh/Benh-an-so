@@ -8,6 +8,14 @@ public record LoginCommand(
         String username,
 
         @NotBlank
-        String password
+        String password,
 
-){}
+        String ipAddress,
+
+        String userAgent
+
+) {
+    public LoginCommand(String username, String password) {
+        this(username, password, null, null);
+    }
+}

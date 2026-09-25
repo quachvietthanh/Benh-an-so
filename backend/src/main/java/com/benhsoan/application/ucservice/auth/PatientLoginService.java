@@ -192,10 +192,15 @@ public class PatientLoginService implements PatientLoginUseCase {
         userSessionRepository.revokeByUserId(user.getId(), now);
 
         String refreshToken = refreshTokenGeneratorPort.generate();
+        String userAgent = command.userAgent() != null && command.userAgent().length() > 500
+                ? command.userAgent().substring(0, 500)
+                : command.userAgent();
         UserSession session = UserSession.create(
                 user.getId(),
                 tokenHashPort.hash(refreshToken),
-                now.plus(REFRESH_TOKEN_TIMEOUT)
+                now.plus(REFRESH_TOKEN_TIMEOUT),
+                command.ipAddress(),
+                userAgent
         );
         userSessionRepository.save(session);
 

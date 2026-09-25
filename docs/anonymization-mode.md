@@ -93,8 +93,7 @@ Both permissions are granted to the `ADMIN` role only.
   - `BillingRestMapper` — fullName.
 - **Exports (TC-02):**
   - `ExportPrescriptionService` — masks patient name in prescription PDF.
-  - `IssueMedicalRecordCopyService` — masks patient name in medical record copy PDF.
-  - Operational report CSV does not contain patient identity and is unchanged.
+  - `ExportOperationalReportService` (NCL-15-CN-007) — masks patient name (`BỆNH NHÂN #<patientCode>`), phone (`09******78`), and address (`[ĐỊA CHỈ ĐÃ ẨN DANH]`) in CSV exports (`VISIT_REPORT`, `OPERATIONAL_REPORT`) by default (`unmask=false`). Full unmasked export requires `REPORT_UNMASKED_EXPORT` permission or `ADMIN` role, along with an explicit reason (minimum 5 characters), and writes an audit log recording `unmasked: true` and the reason.
 
 ## 8. Database Safety & Update Protection
 

@@ -1,5 +1,5 @@
 -- =====================================================
--- V90__add_active_record_duration_and_archive_metadata.sql
+-- V100__add_active_record_duration_and_archive_metadata.sql
 -- NCL-11-CN-008: Kho lưu trữ hồ sơ hết thời hạn và tra cứu kho lưu trữ
 -- =====================================================
 

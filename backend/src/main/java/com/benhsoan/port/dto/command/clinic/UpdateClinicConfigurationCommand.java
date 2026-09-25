@@ -10,7 +10,8 @@ public record UpdateClinicConfigurationCommand(
         LocalTime closingTime,
         Integer retentionYears,
         Integer signingDeadlineHours,
-        Integer activeRecordDurationMonths
+        Integer activeRecordDurationMonths,
+        Integer sessionIdleTimeoutMinutes
 ) {
 
     public UpdateClinicConfigurationCommand(
@@ -22,7 +23,7 @@ public record UpdateClinicConfigurationCommand(
             Integer retentionYears,
             Integer signingDeadlineHours
     ) {
-        this(clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, null);
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, null, null);
     }
 
     public UpdateClinicConfigurationCommand(
@@ -33,6 +34,6 @@ public record UpdateClinicConfigurationCommand(
             LocalTime closingTime,
             Integer retentionYears
     ) {
-        this(clinicName, address, phone, openingTime, closingTime, retentionYears, null, null);
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, null, null, null);
     }
 }

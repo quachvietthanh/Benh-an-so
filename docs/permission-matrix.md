@@ -102,6 +102,15 @@
 | `/api/v1/pharmacy/inventory` | POST | ✅ | ❌ | ❌ | ✅ |
 | `/api/v1/pharmacy/inventory/{id}` | PUT | ✅ | ❌ | ❌ | ✅ |
 | `/api/v1/pharmacy/inventory/{id}` | DELETE | ✅ | ❌ | ❌ | ❌ |
+| `/inventory/procurements/suggestions` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements` | POST | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements/{id}` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements/{id}` | PUT | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements/{id}/submit` | POST | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements/{id}/cancel` | POST | ✅ | ❌ | ❌ | ✅ |
+| `/inventory/procurements/{id}/approve` | POST | ✅ (Quản lý/Admin) | ❌ | ❌ | ❌ (SoD: không tự duyệt) |
+| `/inventory/procurements/{id}/reject` | POST | ✅ (Quản lý/Admin) | ❌ | ❌ | ❌ |
 |  |  |  |  |  |  |
 | **Invoices / Payments** |  |  |  |  |  |
 | `/api/v1/invoices` | GET | ✅ | ❌ | ✅ | ❌ |
@@ -222,8 +231,9 @@ VITAL_SIGN_CREATE, VITAL_SIGN_READ, VITAL_SIGN_UPDATE
 // Diagnosis
 DIAGNOSIS_CREATE, DIAGNOSIS_READ, DIAGNOSIS_UPDATE
 
-// Pharmacy
-PHARMACY_CREATE, PHARMACY_READ, PHARMACY_UPDATE, PHARMACY_DELETE
+// Pharmacy & Procurement
+PHARMACY_CREATE, PHARMACY_READ, PHARMACY_UPDATE, PHARMACY_DELETE,
+MEDICATION_PROCUREMENT_READ, MEDICATION_PROCUREMENT_CREATE, MEDICATION_PROCUREMENT_APPROVE
 
 // Invoice
 INVOICE_CREATE, INVOICE_READ, INVOICE_UPDATE, INVOICE_DELETE
@@ -240,4 +250,7 @@ PERMISSION_READ
 
 // Medical Queue
 QUEUE_CREATE, QUEUE_CALL_NEXT, QUEUE_UPDATE_STATUS, QUEUE_VIEW, QUEUE_COUNT
+
+// Reporting & Export (NCL-15-CN-007)
+REPORT_VIEW, REPORT_EXPORT, REPORT_UNMASKED_EXPORT
 ```

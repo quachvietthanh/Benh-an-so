@@ -2,6 +2,7 @@ package com.benhsoan.adapter.inbound.rest.request.clinic;
 
 import java.time.LocalTime;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +32,10 @@ public record UpdateClinicConfigurationRequest(
         Integer signingDeadlineHours,
 
         @Min(value = 1, message = "Active record duration months must be at least 1.")
-        Integer activeRecordDurationMonths
+        Integer activeRecordDurationMonths,
+
+        @Min(value = 5, message = "Session idle timeout must be at least 5 minutes.")
+        @Max(value = 1440, message = "Session idle timeout must not exceed 1440 minutes.")
+        Integer sessionIdleTimeoutMinutes
 ) {
 }

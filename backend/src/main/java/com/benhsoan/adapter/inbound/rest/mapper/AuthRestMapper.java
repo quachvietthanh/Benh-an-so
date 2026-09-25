@@ -45,6 +45,15 @@ public class AuthRestMapper {
                                 request.password());
         }
 
+        public LoginCommand toCommand(LoginRequest request, String ipAddress, String userAgent) {
+
+                return new LoginCommand(
+                                request.username(),
+                                request.password(),
+                                ipAddress,
+                                userAgent);
+        }
+
         public RefreshTokenCommand toCommand(RefreshTokenRequest request) {
 
                 return new RefreshTokenCommand(
@@ -63,7 +72,17 @@ public class AuthRestMapper {
                 return new VerifyTwoFactorCommand(
                                 request.twoFactorToken(),
                                 request.code(),
-                                ipAddress);
+                                ipAddress,
+                                null);
+        }
+
+        public VerifyTwoFactorCommand toCommand(VerifyTwoFactorRequest request, String ipAddress, String userAgent) {
+
+                return new VerifyTwoFactorCommand(
+                                request.twoFactorToken(),
+                                request.code(),
+                                ipAddress,
+                                userAgent);
         }
 
         public ResendTwoFactorCommand toCommand(ResendTwoFactorRequest request) {

@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.prescription.exception.PrescriptionMaxDailyDoseConfirmationRequiredException;
+
 import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
 import com.benhsoan.domain.shared.exception.DomainException;
 import com.benhsoan.domain.shared.exception.ValidationException;
@@ -228,6 +230,24 @@ public class GlobalExceptionHandler {
                         "allergenName", warning.allergenName(),
                         "severity", warning.severity(),
                         "reaction", warning.reaction() != null ? warning.reaction() : ""
+                )).toList())
+        );
+    }
+
+    @ExceptionHandler(PrescriptionMaxDailyDoseConfirmationRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleMaxDailyDoseConfirmationRequired(
+            PrescriptionMaxDailyDoseConfirmationRequiredException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                DomainExceptionHttpStatusMapper.statusFor(ex.getCode()),
+                ex.getCode().name(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                Map.of("warnings", ex.getWarnings().stream().map(warning -> Map.<String, Object>of(
+                        "activeIngredient", warning.activeIngredient(),
+                        "totalDailyDoseMg", warning.totalDailyDoseMg(),
+                        "maxDailyDoseMg", warning.maxDailyDoseMg()
                 )).toList())
         );
     }

@@ -22,10 +22,16 @@ import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.medicine.Medicine;
+import com.benhsoan.domain.medicine.MedicineMaxDailyDoseMissingData;
 import com.benhsoan.domain.prescription.Prescription;
 import com.benhsoan.domain.prescription.PrescriptionAmendment;
 import com.benhsoan.domain.prescription.PrescriptionItem;
 import com.benhsoan.domain.prescription.PrescriptionWarningLog;
+import com.benhsoan.domain.prescription.MaxDailyDoseCalculator;
+import com.benhsoan.domain.prescription.MaxDailyDoseEvaluationResult;
+import com.benhsoan.domain.prescription.MaxDailyDoseMissingData;
+import com.benhsoan.domain.prescription.MaxDailyDoseWarning;
+import com.benhsoan.domain.prescription.PrescriptionMaxDailyDoseWarningLog;
 import com.benhsoan.domain.prescription.enums.WarningAction;
 import com.benhsoan.domain.prescription.PrescriptionAllergyWarningLog;
 import com.benhsoan.domain.prescription.exception.PrescriptionAllergyConfirmationRequiredException;
@@ -33,6 +39,7 @@ import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirm
 import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException.InteractionWarning;
 import com.benhsoan.domain.prescription.exception.ControlledMedicineConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionInvalidStatusException;
+import com.benhsoan.domain.prescription.exception.PrescriptionMaxDailyDoseConfirmationRequiredException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException;
 import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionAmendmentException;
@@ -42,16 +49,20 @@ import com.benhsoan.port.dto.command.prescription.AmendPrescriptionItemCommand;
 import com.benhsoan.port.dto.command.prescription.CheckDrugInteractionCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionAllergyOverrideCommand;
 import com.benhsoan.port.dto.command.prescription.PrescriptionInteractionOverrideCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionMaxDailyDoseOverrideCommand;
 import com.benhsoan.port.dto.result.DrugInteractionWarningResult;
+import com.benhsoan.port.dto.result.MaxDailyDoseMissingDataResult;
 import com.benhsoan.port.dto.result.PatientAllergyWarningResult;
 import com.benhsoan.port.dto.result.PrescriptionResult;
 import com.benhsoan.port.inbound.prescription.AmendPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckDrugInteractionUseCase;
 import com.benhsoan.port.inbound.prescription.CheckPatientDrugAllergyUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.medicine.MedicineMaxDailyDoseMissingDataRepository;
 import com.benhsoan.port.outbound.repository.medicine.MedicineRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAllergyWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionAmendmentRepository;
+import com.benhsoan.port.outbound.repository.prescription.PrescriptionMaxDailyDoseWarningLogRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionRepository;
 import com.benhsoan.port.outbound.repository.prescription.PrescriptionWarningLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -77,6 +88,10 @@ public class AmendPrescriptionService
 
     private final PrescriptionAllergyWarningLogRepository allergyWarningLogRepository;
 
+    private final PrescriptionMaxDailyDoseWarningLogRepository maxDailyDoseWarningLogRepository;
+
+    private final MedicineMaxDailyDoseMissingDataRepository medicineMaxDailyDoseMissingDataRepository;
+
     private final PrescriptionAmendmentRepository amendmentRepository;
 
     private final AuditLogRepository auditLogRepository;
@@ -84,6 +99,8 @@ public class AmendPrescriptionService
     private final CurrentUserPort currentUserPort;
 
     private final PrescriptionResultMapper resultMapper;
+
+    private final PrescriptionDisplayContextResolver displayContextResolver;
 
     private final PrescriptionSnapshotMapper snapshotMapper;
 
@@ -118,9 +135,11 @@ public class AmendPrescriptionService
 
         List<AmendPrescriptionItemCommand> itemCommands
                 = validateItemCommands(command.items());
+        Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
         List<PrescriptionItem> replacementItems = buildReplacementItems(
                 prescription,
                 itemCommands,
+                medicines,
                 command.controlledMedicineConfirmed(),
                 now
         );
@@ -155,6 +174,24 @@ public class AmendPrescriptionService
                 command.allergyOverrides()
         );
 
+        // NCL-05-CN-007: total daily active-ingredient dose check against the final
+        // replacement item set. Missing data is reported (never a block); exceedances
+        // must be confirmed with an override reason.
+        MaxDailyDoseEvaluationResult maxDoseCheck = MaxDailyDoseCalculator.evaluate(
+                replacementItems.stream()
+                        .map(item -> toDoseItem(item, medicines.get(item.getMedicineId())))
+                        .toList()
+        );
+        Map<String, String> maxDoseOverrideReasons = validateMaxDailyDoseOverrides(
+                maxDoseCheck.warnings(),
+                command.maxDailyDoseOverrides()
+        );
+
+        // Resolve the display context once so the save flow and the result mapping do
+        // not trigger duplicate database lookups.
+        PrescriptionDisplayContextResolver.PrescriptionDisplayContext displayContext =
+                displayContextResolver.resolve(prescription.getMedicalRecordId(), currentUserId);
+
         prescription.replaceItems(
                 replacementItems,
                 command.note(),
@@ -180,6 +217,17 @@ public class AmendPrescriptionService
                 currentUserId,
                 now
         );
+        saveMaxDailyDoseWarningLogs(
+                saved.getId(),
+                displayContext.patientId(),
+                maxDoseCheck.warnings(),
+                maxDoseOverrideReasons,
+                currentUserId,
+                now
+        );
+
+        recordMissingMaxDailyDoseData(medicines, now);
+
         PrescriptionAmendment amendment = amendmentRepository.save(
                 PrescriptionAmendment.create(
                         UUID.randomUUID(),
@@ -192,9 +240,16 @@ public class AmendPrescriptionService
                 )
         );
 
-        saveAuditLog(saved, amendment, warningLogs.size() + allergyLogs.size(), currentUserId);
+        saveAuditLog(saved, amendment,
+                warningLogs.size() + allergyLogs.size() + maxDoseCheck.warnings().size(),
+                currentUserId);
 
-        return resultMapper.toResult(saved, warningLogs);
+        return resultMapper.toResult(
+                saved,
+                warningLogs,
+                toMissingDataResults(maxDoseCheck.missingData()),
+                displayContext
+        );
     }
 
     private void validateCommand(AmendPrescriptionCommand command) {
@@ -279,6 +334,7 @@ public class AmendPrescriptionService
     private List<PrescriptionItem> buildReplacementItems(
             Prescription prescription,
             List<AmendPrescriptionItemCommand> itemCommands,
+            Map<UUID, Medicine> medicines,
             boolean controlledMedicineConfirmed,
             Instant updatedAt
     ) {
@@ -287,8 +343,6 @@ public class AmendPrescriptionService
         for (PrescriptionItem item : prescription.getItems()) {
             existingByMedicineId.put(item.getMedicineId(), item);
         }
-
-        Map<UUID, Medicine> medicines = loadActiveMedicines(itemCommands);
 
         // Controlled-medicine confirmation is only required when this amendment
         // actually introduces a controlled medicine that was not already on the
@@ -379,7 +433,9 @@ public class AmendPrescriptionService
                 command.route(),
                 command.durationDays(),
                 command.quantity(),
+                existing.getDispensedQuantity(),
                 command.instructions(),
+                command.singleDoseQuantity(),
                 existing.getCreatedAt(),
                 updatedAt
         );
@@ -405,6 +461,7 @@ public class AmendPrescriptionService
                 command.durationDays(),
                 command.quantity(),
                 command.instructions(),
+                command.singleDoseQuantity(),
                 createdAt
         );
     }
@@ -668,5 +725,129 @@ public class AmendPrescriptionService
     }
 
     private record AllergyKey(UUID allergyId, UUID medicineId) {
+    }
+
+    private MaxDailyDoseCalculator.Item toDoseItem(
+            PrescriptionItem item,
+            Medicine medicine
+    ) {
+        return new MaxDailyDoseCalculator.Item(
+                medicine.getActiveIngredient(),
+                medicine.getStrengthValueMg(),
+                item.getSingleDoseQuantity(),
+                item.getFrequency() == null ? 0 : item.getFrequency(),
+                medicine.getMaxDailyDoseMg()
+        );
+    }
+
+    private Map<String, String> validateMaxDailyDoseOverrides(
+            List<MaxDailyDoseWarning> warnings,
+            List<PrescriptionMaxDailyDoseOverrideCommand> overrides
+    ) {
+        List<PrescriptionMaxDailyDoseOverrideCommand> cleanOverrides =
+                overrides == null ? List.of() : overrides;
+
+        Map<String, String> reasonsByIngredient = new LinkedHashMap<>();
+        for (PrescriptionMaxDailyDoseOverrideCommand override : cleanOverrides) {
+            if (override == null
+                    || override.activeIngredient() == null
+                    || override.activeIngredient().isBlank()) {
+                throw new ValidationException(
+                        "Max daily dose override must reference an active ingredient.");
+            }
+            if (override.overrideReason() == null || override.overrideReason().isBlank()) {
+                throw new ValidationException(
+                        "Max daily dose override reason is required.");
+            }
+            String key = normalizeIngredient(override.activeIngredient());
+            if (reasonsByIngredient.put(key, override.overrideReason().trim()) != null) {
+                throw new ValidationException("Duplicate max daily dose override.");
+            }
+        }
+
+        Set<String> detectedKeys = warnings.stream()
+                .map(w -> normalizeIngredient(w.activeIngredient()))
+                .collect(Collectors.toSet());
+
+        for (String suppliedKey : reasonsByIngredient.keySet()) {
+            if (!detectedKeys.contains(suppliedKey)) {
+                throw new ValidationException(
+                        "Override does not belong to a detected max daily dose warning: "
+                                + suppliedKey);
+            }
+        }
+
+        boolean unconfirmed = warnings.stream()
+                .anyMatch(w -> !reasonsByIngredient.containsKey(
+                        normalizeIngredient(w.activeIngredient())));
+        if (unconfirmed) {
+            throw new PrescriptionMaxDailyDoseConfirmationRequiredException(warnings);
+        }
+
+        return Map.copyOf(reasonsByIngredient);
+    }
+
+    private void saveMaxDailyDoseWarningLogs(
+            UUID prescriptionId,
+            UUID patientId,
+            List<MaxDailyDoseWarning> warnings,
+            Map<String, String> overrideReasons,
+            UUID handledBy,
+            Instant handledAt
+    ) {
+        for (MaxDailyDoseWarning warning : warnings) {
+            maxDailyDoseWarningLogRepository.save(PrescriptionMaxDailyDoseWarningLog.create(
+                    UUID.randomUUID(),
+                    prescriptionId,
+                    patientId,
+                    warning.activeIngredient(),
+                    warning.totalDailyDoseMg(),
+                    warning.maxDailyDoseMg(),
+                    overrideReasons.get(normalizeIngredient(warning.activeIngredient())),
+                    handledBy,
+                    handledAt
+            ));
+        }
+    }
+
+    private void recordMissingMaxDailyDoseData(
+            Map<UUID, Medicine> medicines,
+            Instant detectedAt
+    ) {
+        for (Medicine medicine : medicines.values()) {
+            if (medicine.getMaxDailyDoseMg() == null) {
+                medicineMaxDailyDoseMissingDataRepository.record(
+                        medicine.getId(),
+                        medicine.getActiveIngredient(),
+                        MedicineMaxDailyDoseMissingData.REASON_MAX_DAILY_DOSE,
+                        detectedAt
+                );
+            }
+            if (medicine.getStrengthValueMg() == null) {
+                medicineMaxDailyDoseMissingDataRepository.record(
+                        medicine.getId(),
+                        medicine.getActiveIngredient(),
+                        MedicineMaxDailyDoseMissingData.REASON_STRENGTH_VALUE,
+                        detectedAt
+                );
+            }
+        }
+    }
+
+    private List<MaxDailyDoseMissingDataResult> toMissingDataResults(
+            List<MaxDailyDoseMissingData> missingData
+    ) {
+        return missingData.stream()
+                .map(data -> new MaxDailyDoseMissingDataResult(
+                        data.activeIngredient(),
+                        data.reason()
+                ))
+                .toList();
+    }
+
+    private static String normalizeIngredient(String activeIngredient) {
+        return activeIngredient == null
+                ? ""
+                : activeIngredient.trim().toLowerCase(java.util.Locale.ROOT);
     }
 }

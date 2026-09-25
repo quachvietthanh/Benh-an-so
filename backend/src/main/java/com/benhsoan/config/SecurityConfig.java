@@ -53,7 +53,7 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> auth
 
                                                 // ===== AUTHENTICATION =====
-                                                .requestMatchers("/auth/change-password").authenticated()
+                                                .requestMatchers("/auth/change-password", "/auth/sessions/current/extend").authenticated()
                                                 .requestMatchers("/auth/**").permitAll()
 
                                                 .requestMatchers(
@@ -75,6 +75,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/mock-interconnection/**").permitAll()
 
                                                 // ===== ADMIN / USER MANAGEMENT =====
+                                                .requestMatchers("/admin/sessions/**").authenticated()
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/users/**").authenticated()
                                                 .requestMatchers("/audit-logs/**").hasRole("ADMIN")
@@ -99,6 +100,7 @@ public class SecurityConfig {
                                                 // ===== PRESCRIPTIONS / CLINICAL =====
                                                 .requestMatchers("/medicines/**").authenticated()
                                                 .requestMatchers("/prescriptions/**").authenticated()
+                                                .requestMatchers("/prescription-templates/**").authenticated()
                                                 .requestMatchers("/clinical-services/**").authenticated()
                                                 .requestMatchers("/clinical-orders/**").authenticated()
                                                 .requestMatchers("/clinical-order-items/**").authenticated()

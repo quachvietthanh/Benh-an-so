@@ -4,7 +4,10 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auth.UserSession;
 import com.benhsoan.persistence.entity.auth.UserSessionEntity;
@@ -59,6 +62,23 @@ public class UserSessionRepositoryAdapter implements UserSessionRepository {
     @Override
     public boolean existsByRefreshTokenHash(String refreshTokenHash) {
         return jpaRepository.existsByRefreshTokenHash(refreshTokenHash);
+    }
+
+    @Override
+    public Page<UserSession> findActiveSessions(Instant now, Instant activeThreshold, Pageable pageable) {
+        return jpaRepository.findActiveSessions(now, activeThreshold, pageable)
+                .map(mapper::toDomain);
+    }
+
+    @Override
+    public Page<UserSession> findActiveSessions(Instant activeThreshold, Pageable pageable) {
+        return findActiveSessions(Instant.now(), activeThreshold, pageable);
+    }
+
+    @Override
+    @Transactional
+    public void touchLastUsed(UUID sessionId, Instant lastUsedAt) {
+        jpaRepository.touchLastUsed(sessionId, lastUsedAt);
     }
 
     @Override

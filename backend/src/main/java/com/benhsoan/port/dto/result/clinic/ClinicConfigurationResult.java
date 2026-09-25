@@ -10,7 +10,8 @@ public record ClinicConfigurationResult(
         LocalTime closingTime,
         Integer retentionYears,
         Integer signingDeadlineHours,
-        Integer activeRecordDurationMonths
+        Integer activeRecordDurationMonths,
+        Integer sessionIdleTimeoutMinutes
 ) {
 
     public ClinicConfigurationResult(
@@ -22,7 +23,7 @@ public record ClinicConfigurationResult(
             Integer retentionYears,
             Integer signingDeadlineHours
     ) {
-        this(clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, 12);
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, signingDeadlineHours, 12, 30);
     }
 
     public ClinicConfigurationResult(
@@ -33,10 +34,10 @@ public record ClinicConfigurationResult(
             LocalTime closingTime,
             Integer retentionYears
     ) {
-        this(clinicName, address, phone, openingTime, closingTime, retentionYears, 24, 12);
+        this(clinicName, address, phone, openingTime, closingTime, retentionYears, 24, 12, 30);
     }
 
     public static ClinicConfigurationResult empty() {
-        return new ClinicConfigurationResult(null, null, null, null, null, null, null, null);
+        return new ClinicConfigurationResult(null, null, null, null, null, null, null, null, null);
     }
 }
