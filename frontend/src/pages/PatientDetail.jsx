@@ -31,6 +31,7 @@ import {
   MergeCellsOutlined,
   PaperClipOutlined,
   SafetyCertificateOutlined,
+  FileProtectOutlined,
   TeamOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons'
@@ -42,6 +43,7 @@ import { formatDate, formatDateTime, formatGender } from '../utils/helpers'
 import AttachmentResultManager from '../components/attachments/AttachmentResultManager'
 import MedicalRecordList from './MedicalRecordList'
 import PersonalDataConsentModal from '../components/patient/PersonalDataConsentModal'
+import PatientConsentTab from '../components/patient/PatientConsentTab'
 import PatientAllergyBanner from '../components/clinical/PatientAllergyBanner'
 import ChronicDiseaseList from '../components/clinical/ChronicDiseaseList'
 import { getPatientConsentStatus } from '../constants/patientConsentConstants'
@@ -87,6 +89,7 @@ function PatientDetail() {
   const [mergeModalOpen, setMergeModalOpen] = useState(false)
   const [allPatients, setAllPatients] = useState([])
   const [adultTransitionLoading, setAdultTransitionLoading] = useState(false)
+  const [activeTabKey, setActiveTabKey] = useState('history')
   const [form] = Form.useForm()
 
   const loadData = useCallback(async () => {
@@ -450,15 +453,31 @@ function PatientDetail() {
                   </span>
                 )}
               </Space>
-              <Button
-                size="small"
-                type="link"
-                icon={<SafetyCertificateOutlined />}
-                onClick={() => setConsentModalOpen(true)}
-                style={{ fontWeight: 600, color: '#16a34a', padding: 0 }}
-              >
-                Xem phiếu đồng ý
-              </Button>
+              <Space wrap size={8}>
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={() => {
+                    setActiveTabKey('consent')
+                    const el = document.getElementById('patient-detail-tabs-section')
+                    if (el) el.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                  style={{ fontWeight: 600, borderRadius: 6 }}
+                >
+                  Quản lý & Cập nhật phiếu
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<FileProtectOutlined />}
+                  onClick={() => setConsentModalOpen(true)}
+                  style={{ fontWeight: 600, color: '#16a34a', padding: 0 }}
+                >
+                  Xem văn bản mẫu
+                </Button>
+              </Space>
             </div>
           </Descriptions.Item>
 
@@ -550,73 +569,91 @@ function PatientDetail() {
         patient={patient}
       />
 
-      {canViewHistory && (
-        <Card bodyStyle={{ padding: 16 }}>
-          <Tabs
-            defaultActiveKey="history"
-            items={[
-              {
-                key: 'history',
-                label: (
-                  <span>
-                    <FileTextOutlined /> Lịch sử khám chữa bệnh ({history.length})
-                  </span>
-                ),
-                children: (
-                  <Table
-                    columns={historyColumns}
-                    dataSource={history}
-                    rowKey="id"
-                    pagination={false}
-                    locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }}
-                  />
-                ),
-              },
-              {
-                key: 'chronicDiseases',
-                label: (
-                  <span>
-                    <MedicineBoxOutlined /> Tiền sử bệnh mạn tính
-                  </span>
-                ),
-                children: (
-                  <ChronicDiseaseList
-                    patientId={patient.id}
-                    patientName={patient.fullName}
-                    currentUser={user}
-                    bordered={false}
-                  />
-                ),
-              },
-              {
-                key: 'records',
-                label: (
-                  <span>
-                    <FolderOutlined /> Hồ sơ bệnh án & Lưu trữ
-                  </span>
-                ),
-                children: (
-                  <MedicalRecordList patientId={patient.id} />
-                ),
-              },
-              {
-                key: 'attachments',
-                label: (
-                  <span>
-                    <PaperClipOutlined /> Kết quả Cận lâm sàng & Tệp đính kèm
-                  </span>
-                ),
-                children: (
-                  <AttachmentResultManager
-                    patientIdFilter={patient.id}
-                    patientNameFilter={patient.fullName}
-                    compact
-                  />
-                ),
-              },
-            ]}
-          />
-        </Card>
+      {(canViewHistory || canManage) && (
+        <div id="patient-detail-tabs-section">
+          <Card bodyStyle={{ padding: 16 }}>
+            <Tabs
+              activeKey={activeTabKey}
+              onChange={setActiveTabKey}
+              items={[
+                {
+                  key: 'history',
+                  label: (
+                    <span>
+                      <FileTextOutlined /> Lịch sử khám chữa bệnh ({history.length})
+                    </span>
+                  ),
+                  children: (
+                    <Table
+                      columns={historyColumns}
+                      dataSource={history}
+                      rowKey="id"
+                      pagination={false}
+                      locale={{ emptyText: 'Bệnh nhân chưa có lượt khám' }}
+                    />
+                  ),
+                },
+                {
+                  key: 'consent',
+                  label: (
+                    <span>
+                      <SafetyCertificateOutlined /> Phiếu đồng ý & Quyền riêng tư (NCL-15)
+                    </span>
+                  ),
+                  children: (
+                    <PatientConsentTab
+                      patient={patient}
+                      canManage={canManage && !isPatientMerged}
+                      onPatientUpdated={loadData}
+                    />
+                  ),
+                },
+                {
+                  key: 'chronicDiseases',
+                  label: (
+                    <span>
+                      <MedicineBoxOutlined /> Tiền sử bệnh mạn tính
+                    </span>
+                  ),
+                  children: (
+                    <ChronicDiseaseList
+                      patientId={patient.id}
+                      patientName={patient.fullName}
+                      currentUser={user}
+                      bordered={false}
+                    />
+                  ),
+                },
+                {
+                  key: 'records',
+                  label: (
+                    <span>
+                      <FolderOutlined /> Hồ sơ bệnh án & Lưu trữ
+                    </span>
+                  ),
+                  children: (
+                    <MedicalRecordList patientId={patient.id} />
+                  ),
+                },
+                {
+                  key: 'attachments',
+                  label: (
+                    <span>
+                      <PaperClipOutlined /> Kết quả Cận lâm sàng & Tệp đính kèm
+                    </span>
+                  ),
+                  children: (
+                    <AttachmentResultManager
+                      patientIdFilter={patient.id}
+                      patientNameFilter={patient.fullName}
+                      compact
+                    />
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        </div>
       )}
 
       <Modal
