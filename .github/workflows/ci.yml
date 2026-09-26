@@ -1,0 +1,128 @@
+name: CI / CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================================
+  # JOB 1: Backend CI (Spring Boot 3 + Java 21 + Testcontainers)
+  # ==========================================================
+  backend-ci:
+    name: Backend Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK 21 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      # Pre-pull MySQL 8.4 image to accelerate Testcontainers startup time
+      - name: Pre-pull MySQL 8.4 image for Testcontainers
+        run: |
+          echo "Pre-pulling MySQL 8.4 image to accelerate Testcontainers startup..."
+          docker pull mysql:8.4
+
+      - name: Grant Execute Permission to Maven Wrapper
+        working-directory: backend
+        run: |
+          chmod +x mvnw || true
+
+      - name: Run Backend Unit & Integration Tests
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          TESTCONTAINERS_RYUK_DISABLED: "false"
+        run: |
+          ./mvnw -B -ntp clean test
+
+      - name: Package Backend Application (Executable JAR)
+        working-directory: backend
+        run: |
+          ./mvnw -B -ntp package -DskipTests
+
+      - name: Upload Surefire Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload Backend Build Artifact (JAR)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
+          retention-days: 7
+
+  # ==========================================================
+  # JOB 2: Frontend CI (Node 20 + React + Vite)
+  # ==========================================================
+  frontend-ci:
+    name: Frontend Lint, Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: |
+          npm run lint
+
+      - name: Run Frontend Tests
+        working-directory: frontend
+        run: |
+          npm test
+
+      - name: Build Frontend Application
+        working-directory: frontend
+        run: |
+          npm run build
+
+      - name: Check Bundle Size
+        working-directory: frontend
+        run: |
+          npm run check:bundle
+
+      - name: Upload Frontend Build Artifact (Dist)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
