@@ -66,6 +66,7 @@ const CashierShiftClosingPage = React.lazy(() => import('../pages/CashierShiftCl
 const CashierShiftHistoryPage = React.lazy(() => import('../pages/CashierShiftHistoryPage.jsx'))
 const DiscountRequestManagementPage = React.lazy(() => import('../pages/DiscountRequestManagementPage.jsx'))
 const WaitingRoomDisplayPage = React.lazy(() => import('../pages/WaitingRoomDisplayPage'))
+const PrescriptionReconciliationPage = React.lazy(() => import('../pages/PrescriptionReconciliationPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -217,6 +218,8 @@ function AppRoutes() {
         <Route path="system/specialties" element={<PrivateRoute allowedPermissions={['SPECIALTY_MANAGE']} allowedRoles={['admin']}><LazyPage><SpecialtyManagementPage /></LazyPage></PrivateRoute>} />
         <Route path="specialties" element={<Navigate to="/system/specialties" replace />} />
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
+        <Route path="prescription-reconciliation" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_RECONCILIATION_VIEW']} allowedRoles={['admin', 'pharmacist']}><LazyPage><PrescriptionReconciliationPage /></LazyPage></PrivateRoute>} />
+        <Route path="pharmacy/prescription-reconciliation" element={<Navigate to="/prescription-reconciliation" replace />} />
         <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
         <Route path="admin/sessions" element={<PrivateRoute allowedPermissions={['SESSION_READ']} allowedRoles={['admin']}><LazyPage><SessionManagementPage /></LazyPage></PrivateRoute>} />
