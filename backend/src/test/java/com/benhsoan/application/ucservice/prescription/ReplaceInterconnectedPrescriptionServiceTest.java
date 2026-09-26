@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -331,17 +332,43 @@ class ReplaceInterconnectedPrescriptionServiceTest {
         service.replace(command());
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(captor.capture());
-        AuditLog auditLog = captor.getValue();
+        verify(auditLogRepository, times(2)).save(captor.capture());
 
-        assertEquals(ActionType.UPDATE, auditLog.getActionType());
-        assertEquals(original.getId(), auditLog.getResourceId());
-        assertEquals(DOCTOR_ID, auditLog.getUserId());
-        assertEquals(NOW, auditLog.getCreatedAt());
-        assertTrue(auditLog.getDetail().contains(REPLACEMENT_ID.toString()));
-        assertTrue(auditLog.getDetail().contains(REPLACEMENT_CODE));
-        assertTrue(auditLog.getDetail().contains(REASON));
-        assertTrue(auditLog.getDetail().contains("REPLACED"));
+        AuditLog originalAudit = captor.getAllValues().stream()
+                .filter(log -> original.getId().equals(log.getResourceId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(ActionType.UPDATE, originalAudit.getActionType());
+        assertEquals(original.getId(), originalAudit.getResourceId());
+        assertEquals(DOCTOR_ID, originalAudit.getUserId());
+        assertEquals(NOW, originalAudit.getCreatedAt());
+        assertTrue(originalAudit.getDetail().contains(REPLACEMENT_ID.toString()));
+        assertTrue(originalAudit.getDetail().contains(REPLACEMENT_CODE));
+        assertTrue(originalAudit.getDetail().contains(REASON));
+        assertTrue(originalAudit.getDetail().contains("REPLACED"));
+    }
+
+    @Test
+    @DisplayName("The new replacement prescription is audited with the original it replaces")
+    void writesAuditForReplacementPrescription() {
+        stubSend(successInterconnection());
+
+        service.replace(command());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository, times(2)).save(captor.capture());
+
+        AuditLog replacementAudit = captor.getAllValues().stream()
+                .filter(log -> REPLACEMENT_ID.equals(log.getResourceId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(ActionType.UPDATE, replacementAudit.getActionType());
+        assertEquals(REPLACEMENT_ID, replacementAudit.getResourceId());
+        assertEquals(DOCTOR_ID, replacementAudit.getUserId());
+        assertEquals(NOW, replacementAudit.getCreatedAt());
+        assertTrue(replacementAudit.getDetail().contains(original.getId().toString()));
+        assertTrue(replacementAudit.getDetail().contains(ORIGINAL_CODE));
+        assertTrue(replacementAudit.getDetail().contains(REASON));
     }
 
     @Test

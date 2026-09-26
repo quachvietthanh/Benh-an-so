@@ -138,6 +138,21 @@ class PrescriptionReplacementTest {
     }
 
     @Test
+    @DisplayName("A replaced prescription cannot be cancelled")
+    void replacedPrescriptionCannotBeCancelled() {
+        Prescription original = interconnectedPendingPrescription();
+        original.markReplaced(DOCTOR_ID, NOW);
+
+        PrescriptionInvalidStatusException exception = assertThrows(
+                PrescriptionInvalidStatusException.class,
+                () -> original.cancel("Hủy nhầm", DOCTOR_ID, NOW.plusSeconds(60))
+        );
+
+        assertTrue(exception.getMessage().contains("cannot be cancelled"));
+        assertEquals(PrescriptionStatus.REPLACED, original.getStatus());
+    }
+
+    @Test
     @DisplayName("A replacement is linked to the original and stores the reason")
     void linksReplacementToOriginal() {
         Prescription original = interconnectedPendingPrescription();

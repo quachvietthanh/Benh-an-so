@@ -18,6 +18,7 @@ import com.benhsoan.domain.prescription.exception.PrescriptionNotFoundException;
 import com.benhsoan.domain.prescription.exception.UnauthorizedPrescriptionReplacementException;
 import com.benhsoan.domain.shared.exception.ValidationException;
 import com.benhsoan.port.dto.command.prescription.CreatePrescriptionCommand;
+import com.benhsoan.port.dto.command.prescription.PrescriptionCreationContext;
 import com.benhsoan.port.dto.command.prescription.ReplacePrescriptionCommand;
 import com.benhsoan.port.dto.result.PrescriptionInterconnectionResult;
 import com.benhsoan.port.dto.result.PrescriptionReplacementResult;
@@ -65,7 +66,7 @@ public class ReplaceInterconnectedPrescriptionService implements ReplaceIntercon
                 .orElseThrow(() -> new PrescriptionNotFoundException(command.originalPrescriptionId()));
 
         requirePrescribingDoctor(original, actorId, now);
-        clinicalContextValidator.requireDoctorPermissionForPrescriptionCancellation(
+        clinicalContextValidator.requireDoctorPermissionForPrescriptionReplacement(
                 original.getMedicalRecordId(),
                 actorId
         );
@@ -133,6 +134,7 @@ public class ReplaceInterconnectedPrescriptionService implements ReplaceIntercon
                 .contraindicationOverrides(requested.contraindicationOverrides())
                 .maxDailyDoseOverrides(requested.maxDailyDoseOverrides())
                 .controlledMedicineConfirmed(requested.controlledMedicineConfirmed())
+                .creationContext(PrescriptionCreationContext.REPLACEMENT)
                 .build();
     }
 
@@ -169,13 +171,21 @@ public class ReplaceInterconnectedPrescriptionService implements ReplaceIntercon
             UUID actorId,
             Instant replacedAt
     ) {
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("prescriptionCode", original.getPrescriptionCode());
-        detail.put("status", original.getStatus().name());
-        detail.put("replacementPrescriptionId", replacement.getId().toString());
-        detail.put("replacementPrescriptionCode", replacement.getPrescriptionCode());
-        detail.put("replacementReason", replacementReason);
-        detail.put("replacedAt", replacedAt.toString());
+        Map<String, Object> originalDetail = new LinkedHashMap<>();
+        originalDetail.put("prescriptionCode", original.getPrescriptionCode());
+        originalDetail.put("status", original.getStatus().name());
+        originalDetail.put("replacementPrescriptionId", replacement.getId().toString());
+        originalDetail.put("replacementPrescriptionCode", replacement.getPrescriptionCode());
+        originalDetail.put("replacementReason", replacementReason);
+        originalDetail.put("replacedAt", replacedAt.toString());
+
+        // The replacement itself must also expose the relationship, so auditing the new
+        // prescription reveals that it was created as a replacement of the original.
+        Map<String, Object> replacementDetail = new LinkedHashMap<>();
+        replacementDetail.put("replacesPrescriptionId", original.getId().toString());
+        replacementDetail.put("replacesPrescriptionCode", original.getPrescriptionCode());
+        replacementDetail.put("replacementReason", replacementReason);
+        replacementDetail.put("replacedAt", replacedAt.toString());
 
         try {
             auditLogRepository.save(AuditLog.create(
@@ -183,7 +193,16 @@ public class ReplaceInterconnectedPrescriptionService implements ReplaceIntercon
                     ActionType.UPDATE,
                     ResourceType.PRESCRIPTION,
                     original.getId(),
-                    objectMapper.writeValueAsString(detail),
+                    objectMapper.writeValueAsString(originalDetail),
+                    null,
+                    replacedAt
+            ));
+            auditLogRepository.save(AuditLog.create(
+                    actorId,
+                    ActionType.UPDATE,
+                    ResourceType.PRESCRIPTION,
+                    replacement.getId(),
+                    objectMapper.writeValueAsString(replacementDetail),
                     null,
                     replacedAt
             ));

@@ -346,7 +346,7 @@ public class Prescription {
         if (status == PrescriptionStatus.CANCELLED) {
             throw new PrescriptionInvalidStatusException("Cancelled prescriptions cannot be dispensed.");
         }
-        ensureNotReplaced();
+        ensureNotReplaced("Replaced prescriptions can no longer be dispensed.");
 
         UUID validatedDispensedBy = requireNonNull(dispensedBy, "Dispensing user id is required.");
         Instant validatedDispensedAt = requireNonNull(dispensedAt, "Dispensing time is required.");
@@ -362,7 +362,7 @@ public class Prescription {
         if (status == PrescriptionStatus.CANCELLED) {
             throw new PrescriptionInvalidStatusException("Cancelled prescriptions cannot be dispensed.");
         }
-        ensureNotReplaced();
+        ensureNotReplaced("Replaced prescriptions can no longer be dispensed.");
 
         UUID validatedDispensedBy = requireNonNull(dispensedBy, "Dispensing user id is required.");
         Instant validatedDispensedAt = requireNonNull(dispensedAt, "Dispensing time is required.");
@@ -383,6 +383,7 @@ public class Prescription {
                     "Partially dispensed prescriptions cannot be cancelled. Inventory has already been deducted."
             );
         }
+        ensureNotReplaced("Replaced prescriptions cannot be cancelled.");
 
         String validatedReason = requireText(cancelReason, "Cancellation reason is required.");
         if (validatedReason.length() > 500) {
@@ -432,11 +433,9 @@ public class Prescription {
         }
     }
 
-    private void ensureNotReplaced() {
+    private void ensureNotReplaced(String message) {
         if (status == PrescriptionStatus.REPLACED) {
-            throw new PrescriptionInvalidStatusException(
-                    "Replaced prescriptions can no longer be dispensed."
-            );
+            throw new PrescriptionInvalidStatusException(message);
         }
     }
 
