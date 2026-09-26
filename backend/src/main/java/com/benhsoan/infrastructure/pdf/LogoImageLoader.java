@@ -2,7 +2,6 @@ package com.benhsoan.infrastructure.pdf;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
@@ -52,7 +51,8 @@ public final class LogoImageLoader {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Fail-safe: Unable to load logo image from source, proceeding without logo. Error: {}", ex.getMessage());
+            log.warn("Fail-safe: Unable to load logo image from source, proceeding without logo. Error: {}",
+                    ex.getMessage());
         }
 
         return null;

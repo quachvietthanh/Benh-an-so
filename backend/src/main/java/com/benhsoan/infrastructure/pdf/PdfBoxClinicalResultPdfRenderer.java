@@ -240,10 +240,6 @@ public class PdfBoxClinicalResultPdfRenderer implements ClinicalResultPdfRendere
         return wrappedLines;
     }
 
-    private void wrapParagraph(String paragraph, FontMetrics metrics, List<String> wrappedLines) {
-        wrapParagraphWithWidth(paragraph, metrics, wrappedLines, CONTENT_WIDTH);
-    }
-
     private void wrapParagraphWithWidth(String paragraph, FontMetrics metrics, List<String> wrappedLines, int maxWidth) {
         if (paragraph.isEmpty()) {
             wrappedLines.add("");
@@ -266,15 +262,6 @@ public class PdfBoxClinicalResultPdfRenderer implements ClinicalResultPdfRendere
         if (!currentLine.isEmpty()) {
             wrappedLines.add(currentLine.toString());
         }
-    }
-
-    private void addLongWord(
-            String word,
-            FontMetrics metrics,
-            List<String> wrappedLines,
-            StringBuilder currentLine
-    ) {
-        addLongWordWithWidth(word, metrics, wrappedLines, currentLine, CONTENT_WIDTH);
     }
 
     private void addLongWordWithWidth(

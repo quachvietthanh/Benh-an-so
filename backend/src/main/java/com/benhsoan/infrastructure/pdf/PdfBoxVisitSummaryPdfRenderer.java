@@ -273,10 +273,6 @@ public class PdfBoxVisitSummaryPdfRenderer implements VisitSummaryPdfRenderer {
         return wrappedLines;
     }
 
-    private void wrapParagraph(String paragraph, FontMetrics metrics, List<String> wrappedLines) {
-        wrapParagraphWithWidth(paragraph, metrics, wrappedLines, CONTENT_WIDTH);
-    }
-
     private void wrapParagraphWithWidth(String paragraph, FontMetrics metrics, List<String> wrappedLines, int maxWidth) {
         if (paragraph.isEmpty()) {
             wrappedLines.add("");
