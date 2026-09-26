@@ -48,7 +48,7 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
     private static final DecimalFormat MONEY_FORMAT;
 
     static {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("vi", "VN"));
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.of("vi", "VN"));
         symbols.setGroupingSeparator('.');
         MONEY_FORMAT = new DecimalFormat("#,##0", symbols);
     }
@@ -250,10 +250,6 @@ public class PdfBoxInvoicePdfRenderer implements InvoicePdfRenderer {
             wrapParagraphWithWidth(paragraph, metrics, wrappedLines, maxWidth);
         }
         return wrappedLines;
-    }
-
-    private void wrapParagraph(String paragraph, FontMetrics metrics, List<String> wrappedLines) {
-        wrapParagraphWithWidth(paragraph, metrics, wrappedLines, CONTENT_WIDTH);
     }
 
     private void wrapParagraphWithWidth(String paragraph, FontMetrics metrics, List<String> wrappedLines, int maxWidth) {

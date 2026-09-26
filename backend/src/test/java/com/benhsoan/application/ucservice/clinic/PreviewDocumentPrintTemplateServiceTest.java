@@ -11,7 +11,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.benhsoan.domain.clinic.ClinicConfiguration;
 import com.benhsoan.domain.clinic.enums.PrintDocumentType;
 import com.benhsoan.infrastructure.pdf.PdfBoxInvoicePdfRenderer;
 import com.benhsoan.infrastructure.pdf.PdfBoxPrescriptionPdfRenderer;
@@ -22,7 +21,8 @@ import com.benhsoan.port.outbound.time.ClockPort;
 
 class PreviewDocumentPrintTemplateServiceTest {
 
-    private final ClinicConfigurationRepository clinicConfigurationRepository = mock(ClinicConfigurationRepository.class);
+    private final ClinicConfigurationRepository clinicConfigurationRepository = mock(
+            ClinicConfigurationRepository.class);
     private final ClockPort clockPort = mock(ClockPort.class);
     private final PdfBoxPrescriptionPdfRenderer prescriptionPdfRenderer = new PdfBoxPrescriptionPdfRenderer();
     private final PdfBoxVisitSummaryPdfRenderer visitSummaryPdfRenderer = new PdfBoxVisitSummaryPdfRenderer();
@@ -41,8 +41,7 @@ class PreviewDocumentPrintTemplateServiceTest {
                 prescriptionPdfRenderer,
                 visitSummaryPdfRenderer,
                 invoicePdfRenderer,
-                clockPort
-        );
+                clockPort);
     }
 
     @Test
@@ -55,8 +54,7 @@ class PreviewDocumentPrintTemplateServiceTest {
                 "Giấy phép hoạt động số 12345/SYT",
                 "Chân trang mẫu: Uống thuốc đúng giờ",
                 true,
-                "{}"
-        );
+                "{}");
 
         byte[] pdf = service.preview(command);
 
@@ -76,8 +74,7 @@ class PreviewDocumentPrintTemplateServiceTest {
                 "Mã số thuế: 999999999",
                 "Chân trang mẫu: Xin cảm ơn quý khách",
                 true,
-                "{}"
-        );
+                "{}");
 
         byte[] pdf = service.preview(command);
 
@@ -97,8 +94,7 @@ class PreviewDocumentPrintTemplateServiceTest {
                 "Phòng khám Đa khoa Tiêu chuẩn",
                 "Hẹn tái khám đúng lịch",
                 true,
-                "{}"
-        );
+                "{}");
 
         byte[] pdf = service.preview(command);
 
@@ -118,8 +114,7 @@ class PreviewDocumentPrintTemplateServiceTest {
                 "Phòng khám Đa khoa Tiêu chuẩn",
                 "Kết quả có giá trị trong vòng 30 ngày",
                 true,
-                "{\"showClinicalReason\":true,\"showReferenceRange\":true}"
-        );
+                "{\"showClinicalReason\":true,\"showReferenceRange\":true}");
 
         byte[] pdf = service.preview(command);
 

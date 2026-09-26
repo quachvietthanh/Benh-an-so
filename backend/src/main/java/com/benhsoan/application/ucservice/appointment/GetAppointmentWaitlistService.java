@@ -28,8 +28,7 @@ public class GetAppointmentWaitlistService implements GetAppointmentWaitlistUseC
 
     public GetAppointmentWaitlistService(
             AppointmentWaitlistRepository appointmentWaitlistRepository,
-            AppointmentWaitlistResultMapper resultMapper
-    ) {
+            AppointmentWaitlistResultMapper resultMapper) {
         this(appointmentWaitlistRepository, resultMapper, Instant::now);
     }
 
@@ -37,8 +36,7 @@ public class GetAppointmentWaitlistService implements GetAppointmentWaitlistUseC
     public GetAppointmentWaitlistService(
             AppointmentWaitlistRepository appointmentWaitlistRepository,
             AppointmentWaitlistResultMapper resultMapper,
-            @Autowired(required = false) ClockPort clockPort
-    ) {
+            @Autowired(required = false) ClockPort clockPort) {
         this.appointmentWaitlistRepository = appointmentWaitlistRepository;
         this.resultMapper = resultMapper;
         this.clockPort = clockPort != null ? clockPort : Instant::now;
@@ -67,5 +65,3 @@ public class GetAppointmentWaitlistService implements GetAppointmentWaitlistUseC
                 .toList();
     }
 }
-
-

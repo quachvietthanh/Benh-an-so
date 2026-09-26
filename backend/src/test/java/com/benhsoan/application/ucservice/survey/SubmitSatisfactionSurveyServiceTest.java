@@ -75,8 +75,7 @@ class SubmitSatisfactionSurveyServiceTest {
                 userRepository,
                 auditLogRepository,
                 currentUserPort,
-                clockPort
-        );
+                clockPort);
     }
 
     private Visit createVisit(VisitStatus status) {
@@ -96,8 +95,7 @@ class SubmitSatisfactionSurveyServiceTest {
                 null,
                 doctorId,
                 now.minusSeconds(7200),
-                now.minusSeconds(1800)
-        );
+                now.minusSeconds(1800));
     }
 
     @Test
@@ -111,11 +109,11 @@ class SubmitSatisfactionSurveyServiceTest {
 
         User doctor = User.restore(
                 doctorId, "dr.anh", "hash", "Dr. Nguyen Minh Anh", "anh@clinic.com", "0901000001",
-                UUID.randomUUID(), true, null, now
-        );
+                UUID.randomUUID(), true, null, now);
         when(userRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
 
-        when(surveyRepository.save(any(PatientSatisfactionSurvey.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(surveyRepository.save(any(PatientSatisfactionSurvey.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         SatisfactionSurveyResult result = service.submitSurvey(visitId, 5, "Dịch vụ xuất sắc");
 
@@ -128,7 +126,8 @@ class SubmitSatisfactionSurveyServiceTest {
         assertEquals(5, result.score());
         assertEquals("Dịch vụ xuất sắc", result.comment());
 
-        verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.PATIENT_SATISFACTION_SURVEY, visitId);
+        verify(patientAccessGuard).requirePatientOwnership(patientId, ResourceType.PATIENT_SATISFACTION_SURVEY,
+                visitId);
         verify(surveyRepository).save(any(PatientSatisfactionSurvey.class));
         verify(auditLogRepository).save(any(AuditLog.class));
     }
@@ -140,9 +139,8 @@ class SubmitSatisfactionSurveyServiceTest {
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(completedVisit));
         when(surveyRepository.existsByVisitId(visitId)).thenReturn(true);
 
-        assertThrows(SatisfactionSurveyAlreadyExistsException.class, () ->
-                service.submitSurvey(visitId, 4, "Đánh giá lại")
-        );
+        assertThrows(SatisfactionSurveyAlreadyExistsException.class,
+                () -> service.submitSurvey(visitId, 4, "Đánh giá lại"));
     }
 
     @Test
@@ -151,9 +149,7 @@ class SubmitSatisfactionSurveyServiceTest {
         Visit inProgressVisit = createVisit(VisitStatus.IN_PROGRESS);
         when(visitRepository.findById(visitId)).thenReturn(Optional.of(inProgressVisit));
 
-        assertThrows(VisitInvalidStatusException.class, () ->
-                service.submitSurvey(visitId, 5, "Tốt")
-        );
+        assertThrows(VisitInvalidStatusException.class, () -> service.submitSurvey(visitId, 5, "Tốt"));
     }
 
     @Test
@@ -164,9 +160,7 @@ class SubmitSatisfactionSurveyServiceTest {
         doThrow(new AccessDeniedException("Access denied")).when(patientAccessGuard)
                 .requirePatientOwnership(eq(patientId), eq(ResourceType.PATIENT_SATISFACTION_SURVEY), eq(visitId));
 
-        assertThrows(AccessDeniedException.class, () ->
-                service.submitSurvey(visitId, 5, "Gian lận")
-        );
+        assertThrows(AccessDeniedException.class, () -> service.submitSurvey(visitId, 5, "Gian lận"));
     }
 
     @Test
@@ -174,8 +168,6 @@ class SubmitSatisfactionSurveyServiceTest {
     void testSubmitSurvey_VisitNotFound_ThrowsException() {
         when(visitRepository.findById(visitId)).thenReturn(Optional.empty());
 
-        assertThrows(VisitNotFoundException.class, () ->
-                service.submitSurvey(visitId, 5, "Khong tim thay")
-        );
+        assertThrows(VisitNotFoundException.class, () -> service.submitSurvey(visitId, 5, "Khong tim thay"));
     }
 }

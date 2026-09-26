@@ -54,13 +54,20 @@ class UpdatePatientConsentServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-09-23T10:00:00Z");
 
-    @Mock private PatientRepository patientRepository;
-    @Mock private PatientConsentHistoryRepository patientConsentHistoryRepository;
-    @Mock private CurrentUserPort currentUserPort;
-    @Mock private ClockPort clockPort;
-    @Mock private AuditLogRepository auditLogRepository;
-    @Mock private PatientChangeLogRepository patientChangeLogRepository;
-    @Mock private PatientAccessGuard patientAccessGuard;
+    @Mock
+    private PatientRepository patientRepository;
+    @Mock
+    private PatientConsentHistoryRepository patientConsentHistoryRepository;
+    @Mock
+    private CurrentUserPort currentUserPort;
+    @Mock
+    private ClockPort clockPort;
+    @Mock
+    private AuditLogRepository auditLogRepository;
+    @Mock
+    private PatientChangeLogRepository patientChangeLogRepository;
+    @Mock
+    private PatientAccessGuard patientAccessGuard;
 
     private UpdatePatientConsentService service;
     private final UUID currentUserId = UUID.randomUUID();
@@ -80,8 +87,7 @@ class UpdatePatientConsentServiceTest {
                 changeDetailBuilder,
                 patientResultMapper,
                 patientAccessGuard,
-                new ObjectMapper()
-        );
+                new ObjectMapper());
     }
 
     private Patient createTestPatient(UUID patientId) {
@@ -113,8 +119,7 @@ class UpdatePatientConsentServiceTest {
                 false,
                 null,
                 null,
-                false
-        );
+                false);
     }
 
     @Test
@@ -205,7 +210,8 @@ class UpdatePatientConsentServiceTest {
                 .scopes(EnumSet.of(ConsentScope.RESEARCH)) // Không có TREATMENT
                 .build();
 
-        ValidationException ex = assertThrows(ValidationException.class, () -> service.updateConsent(patientId, command));
+        ValidationException ex = assertThrows(ValidationException.class,
+                () -> service.updateConsent(patientId, command));
         assertTrue(ex.getMessage().contains("TREATMENT"));
     }
 

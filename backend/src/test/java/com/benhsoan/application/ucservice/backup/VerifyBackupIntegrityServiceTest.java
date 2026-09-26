@@ -56,8 +56,7 @@ class VerifyBackupIntegrityServiceTest {
                 authorizer,
                 currentUserPort,
                 clockPort,
-                auditLogWriter
-        );
+                auditLogWriter);
 
         when(currentUserPort.hasRole("ADMIN")).thenReturn(true);
         when(currentUserPort.getCurrentUserId()).thenReturn(ADMIN_ID);
@@ -86,9 +85,9 @@ class VerifyBackupIntegrityServiceTest {
                 28,
                 150,
                 "87",
-                NOW
-        );
-        when(storagePort.verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(), successfulRecord.getFileName()))
+                NOW);
+        when(storagePort.verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(),
+                successfulRecord.getFileName()))
                 .thenReturn(report);
 
         BackupScheduleConfiguration config = BackupScheduleConfiguration.createDefault(ADMIN_ID, NOW);
@@ -103,7 +102,8 @@ class VerifyBackupIntegrityServiceTest {
         assertEquals(28, result.tableCount());
         assertEquals("Bản sao lưu đọc được và đủ dữ liệu.", result.message());
 
-        verify(storagePort).verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(), successfulRecord.getFileName());
+        verify(storagePort).verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(),
+                successfulRecord.getFileName());
         verify(scheduleRepository).save(config);
         verify(auditLogWriter).write(eq(ADMIN_ID), eq(ActionType.READ), eq(successfulRecord.getId()), any());
     }
@@ -127,16 +127,17 @@ class VerifyBackupIntegrityServiceTest {
                 28,
                 150,
                 "87",
-                NOW
-        );
-        when(storagePort.verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(), successfulRecord.getFileName()))
+                NOW);
+        when(storagePort.verifySnapshot(successfulRecord.getId(), successfulRecord.getBackupCode(),
+                successfulRecord.getFileName()))
                 .thenReturn(report);
 
         BackupVerificationReport result = service.verifyById(id);
 
         assertNotNull(result);
         assertTrue(result.valid());
-        // Verify scheduleRepository.save is NEVER called for historical verifyById (Finding 4)
+        // Verify scheduleRepository.save is NEVER called for historical verifyById
+        // (Finding 4)
         verify(scheduleRepository, org.mockito.Mockito.never()).save(any());
     }
 

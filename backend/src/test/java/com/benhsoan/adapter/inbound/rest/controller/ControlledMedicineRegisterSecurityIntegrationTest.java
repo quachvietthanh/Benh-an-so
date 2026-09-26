@@ -37,10 +37,10 @@ import com.benhsoan.port.outbound.security.CurrentUserPort;
 import com.benhsoan.port.outbound.time.ClockPort;
 
 @WebMvcTest(controllers = ControlledMedicineRegisterController.class)
-@Import({ControlledMedicineRegisterRestMapper.class, AnonymizationModeState.class, SecurityConfig.class,
+@Import({ ControlledMedicineRegisterRestMapper.class, AnonymizationModeState.class, SecurityConfig.class,
         JwtAuthenticationFilter.class,
         GlobalExceptionHandler.class, RequirePermissionAspect.class, PermissionEvaluator.class,
-        ControlledMedicineRegisterSecurityIntegrationTest.AspectTestConfig.class})
+        ControlledMedicineRegisterSecurityIntegrationTest.AspectTestConfig.class })
 class ControlledMedicineRegisterSecurityIntegrationTest {
 
     @TestConfiguration
@@ -74,7 +74,8 @@ class ControlledMedicineRegisterSecurityIntegrationTest {
         when(searchUseCase.search(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mockMvc.perform(get("/controlled-medicines/register")
-                        .with(user("manager").authorities(new SimpleGrantedAuthority("PERMISSION_CONTROLLED_MEDICINE_REGISTER_READ"))))
+                .with(user("manager")
+                        .authorities(new SimpleGrantedAuthority("PERMISSION_CONTROLLED_MEDICINE_REGISTER_READ"))))
                 .andExpect(status().isOk());
     }
 
@@ -83,21 +84,22 @@ class ControlledMedicineRegisterSecurityIntegrationTest {
         when(searchUseCase.search(any())).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mockMvc.perform(get("/controlled-medicines/register")
-                        .with(user("pharmacist").authorities(new SimpleGrantedAuthority("PERMISSION_CONTROLLED_MEDICINE_REGISTER_READ"))))
+                .with(user("pharmacist")
+                        .authorities(new SimpleGrantedAuthority("PERMISSION_CONTROLLED_MEDICINE_REGISTER_READ"))))
                 .andExpect(status().isOk());
     }
 
     @Test
     void doctorWithoutPermissionIsForbidden() throws Exception {
         mockMvc.perform(get("/controlled-medicines/register")
-                        .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
+                .with(user("doctor").authorities(new SimpleGrantedAuthority("PERMISSION_PRESCRIPTION_READ"))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void receptionistWithoutPermissionIsForbidden() throws Exception {
         mockMvc.perform(get("/controlled-medicines/register")
-                        .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
+                .with(user("receptionist").authorities(new SimpleGrantedAuthority("PERMISSION_PATIENT_READ"))))
                 .andExpect(status().isForbidden());
     }
 
