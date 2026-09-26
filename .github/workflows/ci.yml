@@ -15,6 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TZ: 'Asia/Ho_Chi_Minh'
+
 jobs:
   # ==========================================================
   # JOB 1: Backend CI (Spring Boot 3 + Java 21 + Testcontainers)
@@ -117,6 +120,8 @@ jobs:
 
       - name: Run Frontend Tests
         working-directory: frontend
+        env:
+          TZ: 'Asia/Ho_Chi_Minh'
         run: |
           npm test
 
