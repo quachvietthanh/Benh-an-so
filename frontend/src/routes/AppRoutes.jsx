@@ -65,6 +65,7 @@ const ContraindicationRuleManagementPage = React.lazy(() => import('../pages/Con
 const CashierShiftClosingPage = React.lazy(() => import('../pages/CashierShiftClosingPage.jsx'))
 const CashierShiftHistoryPage = React.lazy(() => import('../pages/CashierShiftHistoryPage.jsx'))
 const DiscountRequestManagementPage = React.lazy(() => import('../pages/DiscountRequestManagementPage.jsx'))
+const WaitingRoomDisplayPage = React.lazy(() => import('../pages/WaitingRoomDisplayPage'))
 const NotFound = React.lazy(() => import('../pages/NotFound'))
 
 const LazyPage = ({ children }) => (
@@ -139,6 +140,10 @@ function AppRoutes() {
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu-ket-qua" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu" element={<Navigate to="/portal" replace />} />
+
+      {/* NCL-03-CN-014 / QTN-43: Màn hình hiển thị số thứ tự sảnh chờ công cộng (Kiosk/Smart TV) - PUBLIC ROUTE (permitAll), KHÔNG bọc PrivateRoute */}
+      <Route path="/display/waiting-room" element={<LazyPage><WaitingRoomDisplayPage /></LazyPage>} />
+      <Route path="/queues/display-board" element={<Navigate to="/display/waiting-room" replace />} />
 
       <Route
         path="/"
