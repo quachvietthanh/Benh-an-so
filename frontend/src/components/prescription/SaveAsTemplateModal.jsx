@@ -64,13 +64,13 @@ function SaveAsTemplateModal({
   const normalizeAndSetDiagnoses = (rawList) => {
     const map = new Map()
     rawList.forEach((d) => {
-      const code = (d.diagnosisCode || d.code || '').trim()
+      const code = (d.diagnosisCode || d.code || '').trim().toUpperCase()
       const name = fixMojibake(d.diagnosisName || d.name || '').trim()
       if (code && !map.has(code)) {
         map.set(code, {
           code,
           name: name || code,
-          type: d.diagnosisType || 'DIAGNOSIS',
+          type: d.diagnosisType || d.type || 'DIAGNOSIS',
         })
       }
     })

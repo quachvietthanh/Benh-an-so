@@ -88,7 +88,9 @@ export const canSaveAsTemplate = ({
     }
   }
 
-  const prescribedById = normalizeId(prescription.prescribedBy)
+  const prescribedById = normalizeId(
+    prescription.prescribedBy || prescription.prescribedById || prescription.doctorId,
+  )
   const currentId = normalizeId(currentUserId)
 
   if (!prescribedById || !currentId || prescribedById !== currentId) {

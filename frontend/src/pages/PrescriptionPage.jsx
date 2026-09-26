@@ -71,6 +71,7 @@ import PrescriptionAllergyWarningLogsModal from '../components/pharmacy/Prescrip
 import ContraindicationWarningPanel from '../components/prescription/ContraindicationWarningPanel'
 import ContraindicationOverrideModal from '../components/prescription/ContraindicationOverrideModal'
 import PrescriptionTemplateWarningsModal from '../components/prescription/PrescriptionTemplateWarningsModal.jsx'
+import SaveAsTemplateModal from '../components/prescription/SaveAsTemplateModal.jsx'
 import QuickUpdatePregnancyModal from '../components/prescription/QuickUpdatePregnancyModal'
 import PrescriptionDetailModal from '../components/pharmacy/PrescriptionDetailModal'
 import PrescriptionPrintTemplateModal from '../components/pharmacy/PrescriptionPrintTemplateModal'
@@ -153,6 +154,7 @@ import {
   hasSafetyWarnings,
   mapTemplateErrorMessage,
   mapDraftItemToFormItem,
+  canSaveAsTemplate,
 } from '../utils/prescriptionTemplateHelpers.js'
 
 let localItemSequence = 0
@@ -258,10 +260,13 @@ function PrescriptionPage() {
   const [templates, setTemplates] = useState([])
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState(null)
+  const [selectedDiagnosisCodeForTemplate, setSelectedDiagnosisCodeForTemplate] = useState(null)
   const [applyingTemplate, setApplyingTemplate] = useState(false)
   const [templateSafetyModalOpen, setTemplateSafetyModalOpen] = useState(false)
   const [pendingTemplateData, setPendingTemplateData] = useState(null)
   const [appliedSkippedItems, setAppliedSkippedItems] = useState([])
+  const [saveAsTemplateModalOpen, setSaveAsTemplateModalOpen] = useState(false)
+  const [prescriptionToSaveAsTemplate, setPrescriptionToSaveAsTemplate] = useState(null)
 
   const userPermissions = useMemo(() => {
     return (currentUser?.permissions || []).map((p) => String(p || '').toUpperCase().replace(/^PERMISSION_/, ''))
@@ -931,15 +936,34 @@ function PrescriptionPage() {
   // NCL-05-CN-008: Tự động tải đơn thuốc mẫu theo chẩn đoán lượt khám
   const primaryDiagnosis = useMemo(() => {
     if (!Array.isArray(diagnoses) || diagnoses.length === 0) return null
-    return diagnoses.find((d) => d.diagnosisType === 'PRIMARY') || diagnoses[0]
+    return diagnoses.find((d) => d.diagnosisType === 'PRIMARY' || d.type === 'PRIMARY') || diagnoses[0]
   }, [diagnoses])
 
   const currentDiagnosisCode = useMemo(() => {
-    return (primaryDiagnosis?.code || primaryDiagnosis?.diagnosisCode || '').trim()
+    return (primaryDiagnosis?.code || primaryDiagnosis?.diagnosisCode || '').trim().toUpperCase()
   }, [primaryDiagnosis])
 
+  const availableDiagnoses = useMemo(() => {
+    if (!Array.isArray(diagnoses) || diagnoses.length === 0) return []
+    const map = new Map()
+    diagnoses.forEach((d) => {
+      const code = (d.diagnosisCode || d.code || '').trim().toUpperCase()
+      const name = (d.diagnosisName || d.name || '').trim()
+      const isPrimary = d.diagnosisType === 'PRIMARY' || d.type === 'PRIMARY'
+      if (code && !map.has(code)) {
+        map.set(code, { code, name, isPrimary })
+      }
+    })
+    return Array.from(map.values())
+  }, [diagnoses])
+
+  const activeDiagnosisCode = useMemo(() => {
+    if (selectedDiagnosisCodeForTemplate) return selectedDiagnosisCodeForTemplate
+    return currentDiagnosisCode || availableDiagnoses[0]?.code || ''
+  }, [selectedDiagnosisCodeForTemplate, currentDiagnosisCode, availableDiagnoses])
+
   const loadTemplates = useCallback(async (code) => {
-    const diagCode = code || currentDiagnosisCode
+    const diagCode = code || activeDiagnosisCode
     if (!diagCode) {
       setTemplates([])
       return
@@ -955,15 +979,50 @@ function PrescriptionPage() {
     } finally {
       setLoadingTemplates(false)
     }
-  }, [currentDiagnosisCode])
+  }, [activeDiagnosisCode])
 
   useEffect(() => {
-    if (currentDiagnosisCode) {
-      loadTemplates(currentDiagnosisCode)
+    if (activeDiagnosisCode) {
+      loadTemplates(activeDiagnosisCode)
     } else {
       setTemplates([])
     }
-  }, [currentDiagnosisCode, loadTemplates])
+  }, [activeDiagnosisCode, loadTemplates])
+
+  const eligiblePrescriptionForTemplate = useMemo(() => {
+    if (!Array.isArray(prescriptions) || prescriptions.length === 0) return null
+    return prescriptions.find((p) => {
+      const check = canSaveAsTemplate({
+        prescription: p,
+        currentUserId: currentUser?.id,
+        userRoles: roles,
+      })
+      return check.allowed
+    })
+  }, [prescriptions, currentUser?.id, roles])
+
+  const handleOpenSaveAsTemplate = useCallback((presc) => {
+    if (!presc) return
+    const target = {
+      ...presc,
+      prescribedBy: presc.prescribedBy || currentUser?.id,
+      medicalRecordId: presc.medicalRecordId || medicalRecordId,
+    }
+    setPrescriptionToSaveAsTemplate(target)
+    setSaveAsTemplateModalOpen(true)
+  }, [currentUser?.id, medicalRecordId])
+
+  const handleTemplateSaved = useCallback((savedTpl) => {
+    setSaveAsTemplateModalOpen(false)
+    setPrescriptionToSaveAsTemplate(null)
+    const diagCode = (savedTpl?.diagnosisCode || activeDiagnosisCode || '').trim().toUpperCase()
+    if (diagCode) {
+      loadTemplates(diagCode)
+    }
+    if (savedTpl?.id) {
+      setSelectedTemplateId(savedTpl.id)
+    }
+  }, [activeDiagnosisCode, loadTemplates])
 
   const executeApplyTemplateItems = useCallback((data) => {
     const draftItems = Array.isArray(data.items) ? data.items : []
@@ -1476,6 +1535,7 @@ function PrescriptionPage() {
         doctorName: encounter?.doctor?.fullName || record?.doctorName || currentUser?.fullName,
         medicalRecordId: medicalRecordId,
         status: pData.status || 'PENDING_DISPENSE',
+        prescribedBy: pData.prescribedBy || currentUser?.id,
         items: items.map((i) => ({
           medicineId: i.medicineId,
           medicineName: i.medicineName || i.name,
@@ -2367,6 +2427,16 @@ function PrescriptionPage() {
             label: 'Điều chỉnh đơn thuốc',
             onClick: () => startEditPrescription(prescription),
           },
+          canSaveAsTemplate({
+            prescription,
+            currentUserId: currentUser?.id,
+            userRoles: roles,
+          }).allowed && {
+            key: 'save-as-template',
+            icon: <BookOutlined style={{ color: '#2563eb' }} />,
+            label: 'Lưu thành đơn mẫu',
+            onClick: () => handleOpenSaveAsTemplate(prescription),
+          },
           // TC-04: Chỉ bác sĩ đã kê đơn mới có thao tác hủy đơn chưa cấp phát
           cancelCheck.allowed && isPending && {
             type: 'divider',
@@ -2928,15 +2998,49 @@ function PrescriptionPage() {
                           marginBottom: 8,
                         }}
                       >
-                        <Space size={6} align="center">
+                        <Space size={6} align="center" wrap>
                           <BookOutlined style={{ color: '#16a34a', fontSize: 16 }} />
                           <span style={{ fontWeight: 600, color: '#166534', fontSize: 13 }}>
-                            Áp dụng đơn thuốc mẫu (theo chẩn đoán hiện tại)
+                            Áp dụng đơn thuốc mẫu (theo chẩn đoán)
                           </span>
-                          {currentDiagnosisCode && (
-                            <Tag color="cyan" style={{ margin: 0, fontWeight: 500, borderRadius: 4 }}>
-                              Chẩn đoán: {currentDiagnosisCode}
-                            </Tag>
+
+                          {/* Cho phép chọn nhanh giữa các chẩn đoán của lượt khám nếu có nhiều chẩn đoán */}
+                          {availableDiagnoses.length > 1 ? (
+                            <Space size={4} wrap align="center" style={{ marginLeft: 4 }}>
+                              <span style={{ fontSize: 12, color: '#15803d', fontWeight: 500 }}>Chẩn đoán:</span>
+                              {availableDiagnoses.map((diag) => {
+                                const isSelected = diag.code === activeDiagnosisCode
+                                return (
+                                  <Tag.CheckableTag
+                                    key={diag.code}
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      setSelectedDiagnosisCodeForTemplate(diag.code)
+                                      setSelectedTemplateId(null)
+                                      loadTemplates(diag.code)
+                                    }}
+                                    style={{
+                                      borderRadius: 12,
+                                      fontSize: 11,
+                                      padding: '1px 8px',
+                                      border: isSelected ? '1px solid #16a34a' : '1px solid #cbd5e1',
+                                      backgroundColor: isSelected ? '#dcfce7' : '#ffffff',
+                                      color: isSelected ? '#15803d' : '#64748b',
+                                      fontWeight: isSelected ? 600 : 400,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {diag.code} {diag.name ? `— ${diag.name}` : ''} {diag.isPrimary ? '(Chính)' : ''}
+                                  </Tag.CheckableTag>
+                                )
+                              })}
+                            </Space>
+                          ) : (
+                            activeDiagnosisCode && (
+                              <Tag color="cyan" style={{ margin: 0, fontWeight: 500, borderRadius: 4 }}>
+                                Chẩn đoán: {activeDiagnosisCode}
+                              </Tag>
+                            )
                           )}
                         </Space>
 
@@ -2962,17 +3066,25 @@ function PrescriptionPage() {
                             if (val) handleApplyTemplate(val)
                           }}
                           optionFilterProp="label"
-                          options={templates.map((tpl) => ({
-                            value: tpl.id,
-                            label: `Mẫu: ${tpl.diagnosisName || tpl.diagnosisCode} (${tpl.items?.length || 0} thuốc) — Tạo ngày ${dayjs(tpl.createdAt).format('DD/MM/YYYY')}`,
-                          }))}
+                          options={templates.map((tpl, idx) => {
+                            const medSummary = (tpl.items || [])
+                              .map((it) => it.medicineName || it.medicineCode)
+                              .filter(Boolean)
+                              .slice(0, 3)
+                              .join(', ')
+                            const extra = (tpl.items?.length || 0) > 3 ? ` +${tpl.items.length - 3} thuốc khác` : ''
+                            return {
+                              value: tpl.id,
+                              label: `Mẫu #${idx + 1}: ${tpl.diagnosisName || tpl.diagnosisCode} (${tpl.items?.length || 0} thuốc${medSummary ? `: ${medSummary}${extra}` : ''}) — Tạo ngày ${dayjs(tpl.createdAt).format('DD/MM/YYYY')}`,
+                            }
+                          })}
                           notFoundContent={
                             loadingTemplates ? (
                               <Spin size="small" />
                             ) : (
                               <div style={{ padding: '8px 12px', fontSize: 12, color: '#64748b' }}>
-                                {currentDiagnosisCode
-                                  ? `Chưa có đơn mẫu nào cho chẩn đoán [${currentDiagnosisCode}]. Bác sĩ có thể lưu đơn thuốc này thành mẫu sau khi kê.`
+                                {activeDiagnosisCode
+                                  ? `Chưa có đơn mẫu nào cho chẩn đoán [${activeDiagnosisCode}]. Bác sĩ có thể lưu đơn thuốc này thành mẫu sau khi kê.`
                                   : 'Lượt khám chưa có mã chẩn đoán để tìm mẫu phù hợp.'}
                               </div>
                             )
@@ -2980,10 +3092,10 @@ function PrescriptionPage() {
                           id="select-prescription-template"
                         />
 
-                        {currentDiagnosisCode && (
+                        {activeDiagnosisCode && (
                           <Button
                             icon={<SyncOutlined spin={loadingTemplates} />}
-                            onClick={() => loadTemplates(currentDiagnosisCode)}
+                            onClick={() => loadTemplates(activeDiagnosisCode)}
                             disabled={loadingTemplates}
                             style={{
                               display: 'inline-flex',
@@ -3001,6 +3113,40 @@ function PrescriptionPage() {
                           </Button>
                         )}
                       </div>
+
+                      {/* Gợi ý hành động nhanh: Nếu đợt khám đã có đơn thuốc trước đó do bác sĩ kê */}
+                      {eligiblePrescriptionForTemplate && templates.length === 0 && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            padding: '6px 12px',
+                            backgroundColor: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: 6,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 8,
+                          }}
+                        >
+                          <Space size={6} align="center">
+                            <BookOutlined style={{ color: '#2563eb' }} />
+                            <span style={{ fontSize: 12, color: '#1e40af' }}>
+                              Đợt khám đã có đơn thuốc <strong>{eligiblePrescriptionForTemplate.prescriptionCode}</strong>. Bác sĩ có thể lưu đơn này làm mẫu cho chẩn đoán [{activeDiagnosisCode}]:
+                            </span>
+                          </Space>
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<BookOutlined />}
+                            onClick={() => handleOpenSaveAsTemplate(eligiblePrescriptionForTemplate)}
+                            style={{ backgroundColor: '#2563eb', borderColor: '#2563eb', fontSize: 12, height: 26 }}
+                          >
+                            Lưu đơn này làm mẫu
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -4365,6 +4511,29 @@ function PrescriptionPage() {
               >
                 In đơn
               </Button>
+              {isDoctor && (
+                <Button
+                  key="save-template"
+                  type="default"
+                  icon={<BookOutlined style={{ color: '#2563eb' }} />}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    padding: '6px 14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    borderColor: '#93c5fd',
+                    color: '#1d4ed8',
+                    fontWeight: 500,
+                  }}
+                  onClick={() => {
+                    if (justIssuedPrescription) {
+                      handleOpenSaveAsTemplate(justIssuedPrescription)
+                    }
+                  }}
+                >
+                  Lưu thành đơn mẫu
+                </Button>
+              )}
               <Button
                 key="detail"
                 type="default"
@@ -4583,8 +4752,8 @@ function PrescriptionPage() {
         medicines={medicines}
         diagnoses={diagnoses}
         onTemplateSaved={() => {
-          if (currentDiagnosisCode) {
-            loadTemplates(currentDiagnosisCode)
+          if (activeDiagnosisCode) {
+            loadTemplates(activeDiagnosisCode)
           }
         }}
         canEdit={canPrescribe}
@@ -4597,6 +4766,17 @@ function PrescriptionPage() {
           setSelectedPrescriptionForPrint(p)
           setPrintModalOpen(true)
         }}
+      />
+
+      <SaveAsTemplateModal
+        open={saveAsTemplateModalOpen}
+        onClose={() => {
+          setSaveAsTemplateModalOpen(false)
+          setPrescriptionToSaveAsTemplate(null)
+        }}
+        prescription={prescriptionToSaveAsTemplate}
+        diagnoses={diagnoses}
+        onSuccess={handleTemplateSaved}
       />
 
       <CancelPrescriptionModal
