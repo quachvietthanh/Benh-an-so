@@ -289,8 +289,10 @@ export default function VisitSummaryPrintModal({ open, visitId, onClose, onPrint
               <div className="visit-summary-row">
                 <span className="label">Ngày sinh:</span>
                 <span className="value">
-                  {formatDateVi(summaryData.patient?.dateOfBirth)} (
-                  {calculateAgeFromDob(summaryData.patient?.dateOfBirth)})
+                  {formatDateVi(summaryData.patient?.dateOfBirth)}
+                  {calculateAgeFromDob(summaryData.patient?.dateOfBirth)
+                    ? ` (${calculateAgeFromDob(summaryData.patient?.dateOfBirth)})`
+                    : ''}
                 </span>
               </div>
               <div className="visit-summary-row">

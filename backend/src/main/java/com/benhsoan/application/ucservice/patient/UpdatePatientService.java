@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.benhsoan.domain.auditlog.AuditLog;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.patient.Patient;
 import com.benhsoan.domain.patient.PatientAnonymizer;
 import com.benhsoan.domain.patient.PatientChangeLog;
@@ -24,6 +26,8 @@ import com.benhsoan.port.dto.command.patient.UpdatePatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.UpdatePatientUseCase;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
@@ -36,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UpdatePatientService
         implements UpdatePatientUseCase {
+
+    private static final String PATIENT_ROLE = "PATIENT";
 
     private static final java.util.regex.Pattern PHONE_PATTERN =
             java.util.regex.Pattern.compile("^(0|\\+84)(3|5|7|8|9)[0-9]{8}$");
@@ -56,6 +62,10 @@ public class UpdatePatientService
 
     private final com.benhsoan.port.outbound.time.ClockPort clockPort;
 
+    private final UserRepository userRepository;
+
+    private final RoleRepository roleRepository;
+
     @Autowired
     public UpdatePatientService(
             PatientRepository patientRepository,
@@ -65,7 +75,9 @@ public class UpdatePatientService
             PatientChangeDetailBuilder changeDetailBuilder,
             AuditLogRepository auditLogRepository,
             com.benhsoan.port.outbound.repository.patient.PatientConsentHistoryRepository patientConsentHistoryRepository,
-            com.benhsoan.port.outbound.time.ClockPort clockPort
+            com.benhsoan.port.outbound.time.ClockPort clockPort,
+            UserRepository userRepository,
+            RoleRepository roleRepository
     ) {
         this.patientRepository = patientRepository;
         this.patientChangeLogRepository = patientChangeLogRepository;
@@ -75,6 +87,8 @@ public class UpdatePatientService
         this.auditLogRepository = auditLogRepository;
         this.patientConsentHistoryRepository = patientConsentHistoryRepository;
         this.clockPort = clockPort;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
     }
 
     @Override
@@ -253,7 +267,9 @@ public class UpdatePatientService
                 }
             }
 
-            UUID guardianUserId = transitionToAdult ? null : patient.getGuardianUserId();
+            UUID guardianUserId = transitionToAdult
+                    ? null
+                    : resolveGuardianUserId(patient, command.guardianUserId());
 
             patient.updateProfile(
                     fullName,
@@ -427,6 +443,79 @@ public class UpdatePatientService
         );
 
         return patientResultMapper.toResult(updatedPatient);
+    }
+
+    /**
+     * NCL-14-CN-010: a guardian link is only ever written by a staff actor holding
+     * PATIENT_UPDATE (enforced by {@code @RequirePermission} on the controller). Omitting the
+     * field preserves the stored value, so a client can never silently clear a guardian, and
+     * a patient-portal account cannot reach this code path at all.
+     */
+    private UUID resolveGuardianUserId(Patient patient, UUID requestedGuardianUserId) {
+        if (requestedGuardianUserId == null) {
+            return patient.getGuardianUserId();
+        }
+
+        return validateGuardianUser(patient, requestedGuardianUserId);
+    }
+
+    private UUID validateGuardianUser(Patient patient, UUID guardianUserId) {
+        // QTN-44: a guardian link is only meaningful for a minor. Reject an adult target before
+        // any other check, and reuse the canonical patient lifecycle/age policy.
+        if (!patient.isMinor()) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Chỉ hồ sơ bệnh nhân chưa thành niên mới được gán người giám hộ (QTN-44)."
+            );
+        }
+
+        if (guardianUserId.equals(patient.getUserId())) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Người giám hộ không thể là chính tài khoản của bệnh nhân."
+            );
+        }
+
+        User guardian = userRepository.findById(guardianUserId)
+                .orElseThrow(() -> new ValidationException(
+                        "guardianUserId",
+                        "Không tìm thấy tài khoản người giám hộ."
+                ));
+
+        if (!guardian.isActive()) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Tài khoản người giám hộ đã bị vô hiệu hóa."
+            );
+        }
+
+        Role patientRole = roleRepository.findByName(PATIENT_ROLE)
+                .orElseThrow(() -> new IllegalStateException("PATIENT role is not configured."));
+
+        if (!patientRole.getId().equals(guardian.getRoleId())) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Tài khoản người giám hộ phải thuộc vai trò bệnh nhân (PATIENT)."
+            );
+        }
+
+        // Cycle guard (1 level, BR-06): the prospective guardian's portal account must not
+        // already be guarded by THIS patient's portal account. Both sides of the comparison are
+        // users.id values -- guardianUserId references users(id), and the patient's account is
+        // patient.getUserId(), never patient.getId(). Comparing the guardian's userId against
+        // the patient's patientId could never match and silently disabled this guard.
+        Patient guardianProfile = patientRepository.findByUserId(guardianUserId).orElse(null);
+
+        if (guardianProfile != null
+                && guardianProfile.getGuardianUserId() != null
+                && guardianProfile.getGuardianUserId().equals(patient.getUserId())) {
+            throw new ValidationException(
+                    "guardianUserId",
+                    "Không thể tạo liên kết giám hộ vòng giữa hai hồ sơ."
+            );
+        }
+
+        return guardianUserId;
     }
 
     private void validate(

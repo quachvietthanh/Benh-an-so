@@ -44,6 +44,27 @@ public class CurrentUserAdapter implements CurrentUserPort {
     }
 
     @Override
+    public UUID getCurrentSessionId() {
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getPrincipal() == null
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return null;
+        }
+
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof CurrentUserPrincipal currentUser) {
+            return currentUser.sessionId();
+        }
+
+        return null;
+    }
+
+    @Override
     public Set<String> getCurrentUserRoles() {
 
         Authentication authentication =

@@ -35,11 +35,17 @@ public class DeleteMedicalRecordService implements DeleteMedicalRecordUseCase {
     public void delete(UUID medicalRecordId) {
         MedicalRecord record = medicalRecordRepository.findById(medicalRecordId)
                 .orElseThrow(() -> new MedicalRecordNotFoundException(medicalRecordId));
-        Visit visit = visitRepository.findById(record.getVisitId())
-                .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
 
         Instant now = clockPort.now();
         UUID actorId = currentUserPort.getCurrentUserId();
+
+        if (record.isArchived()) {
+            auditWriter.writeDenied(actorId, medicalRecordId, now);
+            throw new com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException();
+        }
+
+        Visit visit = visitRepository.findById(record.getVisitId())
+                .orElseThrow(() -> new VisitNotFoundException(record.getVisitId()));
 
         if (retentionPolicy.isWithinRetention(visit, now)) {
             auditWriter.writeDenied(actorId, medicalRecordId, now);

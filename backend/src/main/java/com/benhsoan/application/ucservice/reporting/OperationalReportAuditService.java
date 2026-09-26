@@ -30,54 +30,62 @@ public class OperationalReportAuditService {
     private final ClockPort clockPort;
 
     public void logExport(ReportType reportType, LocalDate from, LocalDate to) {
-        logExport(reportType, from, to, null);
+        logExport(reportType, from, to, null, false, null);
     }
 
     public void logExport(ReportType reportType, LocalDate from, LocalDate to, UUID doctorId) {
+        logExport(reportType, from, to, doctorId, false, null);
+    }
+
+    public void logExport(
+            ReportType reportType,
+            LocalDate from,
+            LocalDate to,
+            UUID doctorId,
+            boolean unmasked,
+            String unmaskReason
+    ) {
         UUID actorId = currentUserPort.getCurrentUserId();
         Instant exportedAt = clockPort.now();
 
-        String detailJson = doctorId != null ? """
-                {
-                "reportType":"%s",
-                "role":"%s",
-                "from":"%s",
-                "to":"%s",
-                "doctorId":"%s",
-                "exportedAt":"%s"
-                }
-                """.formatted(
-                        reportType.name(),
-                        resolvePrimaryRole(currentUserPort.getCurrentUserRoles()),
-                        from,
-                        to,
-                        doctorId,
-                        exportedAt
-                ) : """
-                {
-                "reportType":"%s",
-                "role":"%s",
-                "from":"%s",
-                "to":"%s",
-                "exportedAt":"%s"
-                }
-                """.formatted(
-                        reportType.name(),
-                        resolvePrimaryRole(currentUserPort.getCurrentUserRoles()),
-                        from,
-                        to,
-                        exportedAt
-                );
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("\"reportType\":\"").append(reportType.name()).append("\",\n");
+        sb.append("\"role\":\"").append(resolvePrimaryRole(currentUserPort.getCurrentUserRoles())).append("\",\n");
+        sb.append("\"from\":\"").append(from).append("\",\n");
+        sb.append("\"to\":\"").append(to).append("\",\n");
+        if (doctorId != null) {
+            sb.append("\"doctorId\":\"").append(doctorId).append("\",\n");
+        }
+        sb.append("\"unmasked\":").append(unmasked).append(",\n");
+        if (unmasked && unmaskReason != null) {
+            sb.append("\"unmaskReason\":\"").append(escapeJson(unmaskReason)).append("\",\n");
+        }
+        sb.append("\"exportedAt\":\"").append(exportedAt).append("\"\n");
+        sb.append("}");
 
         auditLogRepository.save(AuditLog.create(
                 actorId,
                 ActionType.EXPORT,
                 ResourceType.OPERATIONAL_REPORT,
                 null,
-                detailJson,
+                sb.toString(),
                 null,
                 exportedAt
         ));
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -117,6 +125,9 @@ public class OperationalReportAuditService {
     private String resolvePrimaryRole(Set<String> roles) {
         if (roles == null || roles.isEmpty()) {
             return "UNKNOWN";
+        }
+        if (roles.contains("ADMIN")) {
+            return "ADMIN";
         }
         if (roles.contains("MANAGER")) {
             return "MANAGER";

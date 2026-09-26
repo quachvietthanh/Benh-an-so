@@ -104,6 +104,9 @@ import CompletedTodayList from '../components/appointment-queue/CompletedTodayLi
 import { getAppointmentColumns } from './appointment-queue/appointmentColumns'
 import { getQueueBoardColumns } from './appointment-queue/queueBoardColumns'
 import PrioritizeQueueItemModal from '../components/queue/PrioritizeQueueItemModal.jsx'
+import AppointmentWaitlistPanel from '../components/appointment/AppointmentWaitlistPanel.jsx'
+import WaitlistSuggestionModal from '../components/appointment/WaitlistSuggestionModal.jsx'
+import AddToWaitlistModal from '../components/appointment/AddToWaitlistModal.jsx'
 import { sortQueueItemsByPriority } from '../utils/queuePriorityHelpers.js'
 import {
   canRescheduleAppointment,
@@ -152,7 +155,7 @@ function AppointmentQueue() {
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const tabParam = params.get('tab')
-    if (tabParam && ['appointments', 'doctor_weekly_table', 'reception_queue', 'doctor_queue', 'completed'].includes(tabParam)) {
+    if (tabParam && ['appointments', 'doctor_weekly_table', 'reception_queue', 'waitlist', 'doctor_queue', 'completed'].includes(tabParam)) {
       setActiveMainTab(tabParam)
     }
   }, [location.search])
@@ -193,6 +196,10 @@ function AppointmentQueue() {
   const [unconfirmedDrawerOpen, setUnconfirmedDrawerOpen] = useState(false)
   const [quickPatientModalOpen, setQuickPatientModalOpen] = useState(false)
   const [quickPatientSaving, setQuickPatientSaving] = useState(false)
+  const [waitlistSuggestionModalOpen, setWaitlistSuggestionModalOpen] = useState(false)
+  const [waitlistSuggestion, setWaitlistSuggestion] = useState(null)
+  const [addToWaitlistModalOpen, setAddToWaitlistModalOpen] = useState(false)
+  const [waitlistPrefill, setWaitlistPrefill] = useState(null)
   const [logsDrawerOpen, setLogsDrawerOpen] = useState(false)
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [historyPatientTarget, setHistoryPatientTarget] = useState(null)
@@ -635,7 +642,7 @@ function AppointmentQueue() {
     setActionLoading(true)
     try {
       const reason = values.reason || 'Bệnh nhân báo bận'
-      await appointmentApi.cancel(app.id, reason)
+      const cancelRes = await appointmentApi.cancel(app.id, reason)
       saveAppointmentLog({
         appointmentId: app.id,
         appointmentCode: app.appointmentCode || 'Chưa có mã',
@@ -648,11 +655,37 @@ function AppointmentQueue() {
       setCancelModalItem(null)
       cancelForm.resetFields()
       refreshAllData()
+
+      // NCL-03-CN-012: Kiểm tra gợi ý người chờ đầu tiên từ response hủy lịch hẹn
+      const cancelData = cancelRes?.data
+      if (cancelData?.suggestedWaitlistEntry) {
+        setWaitlistSuggestion(cancelData.suggestedWaitlistEntry)
+        setWaitlistSuggestionModalOpen(true)
+      }
     } catch {
       message.error('Không thể hủy lịch hẹn!')
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const handleBookFromWaitlist = (target) => {
+    setWaitlistSuggestionModalOpen(false)
+    setWaitlistSuggestion(null)
+    setBookModalOpen(true)
+    bookForm.setFieldsValue({
+      patientId: target?.patientId || undefined,
+      doctorId: target?.doctorId || undefined,
+      appointmentDate: target?.desiredDate ? dayjs(target.desiredDate) : dayjs(),
+      appointmentTime: dayjs().add(1, 'hour'),
+      reason: target?.note ? `(Từ DS chờ) ${target.note}` : 'Đặt lịch từ danh sách chờ',
+    })
+  }
+
+  const handleOpenAddToWaitlist = (prefill) => {
+    setBookModalOpen(false)
+    setWaitlistPrefill(prefill || null)
+    setAddToWaitlistModalOpen(true)
   }
 
   const handleOpenRescheduleModal = (record) => {
@@ -2083,10 +2116,30 @@ function AppointmentQueue() {
               </Card>
             ),
           },
+          ...(!permissions.isDoctorOnly
+            ? [
+                {
+                  key: 'waitlist',
+                  label: (
+                    <span>
+                      <ClockCircleOutlined /> Danh sách chờ lịch hẹn
+                    </span>
+                  ),
+                  children: (
+                    <AppointmentWaitlistPanel
+                      doctorList={doctorList}
+                      patients={patients}
+                      onOpenDirectBooking={handleBookFromWaitlist}
+                      permissions={permissions}
+                    />
+                  ),
+                },
+              ]
+            : []),
         ].filter((item) => {
           if (permissions.isAdmin) return true
-          if (permissions.isDoctor) return ['doctor_queue', 'completed_history'].includes(item.key)
-          return ['appointments', 'reception_queue'].includes(item.key)
+          if (permissions.isDoctor) return ['doctor_queue', 'completed_history', 'waitlist'].includes(item.key)
+          return ['appointments', 'reception_queue', 'waitlist'].includes(item.key)
         })}
       />
 
@@ -2099,6 +2152,7 @@ function AppointmentQueue() {
         doctorList={doctorList}
         actionLoading={actionLoading}
         onOpenQuickPatient={() => setQuickPatientModalOpen(true)}
+        onOpenWaitlist={handleOpenAddToWaitlist}
       />
 
       <WalkInModal
@@ -2234,6 +2288,41 @@ function AppointmentQueue() {
         doctors={doctors}
         getPatientInfo={getPatientInfo}
         getDoctorInfo={getDoctorInfo}
+      />
+
+      <WaitlistSuggestionModal
+        open={waitlistSuggestionModalOpen}
+        suggestion={waitlistSuggestion}
+        onClose={() => {
+          setWaitlistSuggestionModalOpen(false)
+          setWaitlistSuggestion(null)
+        }}
+        onBookForPatient={handleBookFromWaitlist}
+      />
+
+      <AddToWaitlistModal
+        open={addToWaitlistModalOpen}
+        onCancel={() => {
+          setAddToWaitlistModalOpen(false)
+          setWaitlistPrefill(null)
+        }}
+        onSuccess={() => {
+          refreshAllData()
+        }}
+        patients={patients}
+        doctorList={doctorList}
+        initialPatientId={waitlistPrefill?.patientId}
+        initialDoctorId={waitlistPrefill?.doctorId}
+        initialDesiredDate={waitlistPrefill?.desiredDate}
+        onOpenDirectBooking={(target) => {
+          setBookModalOpen(true)
+          bookForm.setFieldsValue({
+            patientId: target.patientId || undefined,
+            doctorId: target.doctorId || undefined,
+            appointmentDate: target.date ? dayjs(target.date) : dayjs(),
+            appointmentTime: dayjs().add(1, 'hour'),
+          })
+        }}
       />
     </div>
   )

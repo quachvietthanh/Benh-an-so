@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.junit.jupiter.api.DisplayName;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.appointment.Appointment;
@@ -73,6 +74,7 @@ class PatientBookAppointmentServiceTest {
     @Mock private CurrentUserPort currentUserPort;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private ClockPort clockPort;
+    @Mock private com.benhsoan.application.ucservice.patient.PatientAccessGuard patientAccessGuard;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -92,7 +94,8 @@ class PatientBookAppointmentServiceTest {
                 currentUserPort,
                 auditLogRepository,
                 clockPort,
-                objectMapper
+                objectMapper,
+                patientAccessGuard
         );
     }
 
@@ -112,6 +115,8 @@ class PatientBookAppointmentServiceTest {
     private void stubPatientAndDoctor(UUID userId, UUID patientId, UUID doctorId, UUID roleId) {
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, roleId)));
@@ -153,6 +158,10 @@ class PatientBookAppointmentServiceTest {
         assertEquals(doctorId.toString(), node.get("doctorId").asText());
         assertEquals("ONLINE_PORTAL", node.get("channel").asText());
         assertEquals(NOW.toString(), node.get("bookedAt").asText());
+        // NCL-14-CN-010: own-profile booking records the actor and no on-behalf flag.
+        assertEquals(userId.toString(), node.get("bookedByUserId").asText());
+        org.junit.jupiter.api.Assertions.assertFalse(
+                node.get("bookingOnBehalfOfDependent").asBoolean());
     }
 
     @Test
@@ -252,6 +261,8 @@ class PatientBookAppointmentServiceTest {
         when(clockPort.now()).thenReturn(NOW);
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, patientRoleId)));
@@ -272,6 +283,8 @@ class PatientBookAppointmentServiceTest {
         when(clockPort.now()).thenReturn(NOW);
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
@@ -297,6 +310,8 @@ class PatientBookAppointmentServiceTest {
         when(clockPort.now()).thenReturn(NOW);
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
@@ -332,6 +347,8 @@ class PatientBookAppointmentServiceTest {
         when(clockPort.now()).thenReturn(NOW);
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
@@ -357,6 +374,8 @@ class PatientBookAppointmentServiceTest {
         when(clockPort.now()).thenReturn(NOW);
         Patient patient = mock(Patient.class);
         when(patient.getId()).thenReturn(patientId);
+        // An own patient profile is linked to the account, so the target is not "on behalf".
+        org.mockito.Mockito.lenient().when(patient.getUserId()).thenReturn(userId);
         when(currentUserPort.getCurrentUserId()).thenReturn(userId);
         when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(patient));
         when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, doctorRoleId)));
@@ -399,7 +418,8 @@ class PatientBookAppointmentServiceTest {
                 auditLogRepository,
                 clockPort,
                 objectMapper,
-                waitlistRepo
+                waitlistRepo,
+                patientAccessGuard
         );
 
         PatientAppointmentResult result = serviceWithWaitlist.book(
@@ -409,5 +429,164 @@ class PatientBookAppointmentServiceTest {
         assertEquals(com.benhsoan.domain.appointment.enums.WaitlistStatus.SCHEDULED, waitlistEntry.getStatus());
         verify(waitlistRepo).save(waitlistEntry);
     }
-}
 
+    // ------------------------------------------------------------------
+    // NCL-14-CN-010: booking on behalf of a linked dependent patient
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("P2.2: khong dat lich cho ho so phu thuoc da bi gop (MERGED)")
+    void rejectsBookingForMergedDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+        UUID mergedIntoId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient merged = mock(Patient.class);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(merged);
+        // Domain lifecycle guard rejects merged profiles for NEW activity.
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientAlreadyMergedException(dependentId, mergedIntoId))
+                .when(merged).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientAlreadyMergedException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham nhi", dependentId)));
+
+        // Nothing is persisted or audited for a rejected target.
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+        verify(auditLogRepository, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P2.2: khong dat lich cho ho so phu thuoc da bi vo hieu hoa (INACTIVE)")
+    void rejectsBookingForInactiveDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient inactive = mock(Patient.class);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(inactive);
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientInactiveException())
+                .when(inactive).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientInactiveException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham nhi", dependentId)));
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+        verify(auditLogRepository, never()).save(any(AuditLog.class));
+    }
+
+    @Test
+    @DisplayName("P2.2: dat lich cho chinh minh cung bi chan khi ho so bi vo hieu hoa")
+    void rejectsOwnBookingWhenOwnProfileIsInactive() {
+        UUID userId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient ownInactive = mock(Patient.class);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(ownInactive));
+        org.mockito.Mockito.doThrow(new com.benhsoan.domain.patient.exception
+                        .PatientInactiveException())
+                .when(ownInactive).validateCanReceiveNewActivity();
+
+        assertThrows(com.benhsoan.domain.patient.exception.PatientInactiveException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        UUID.randomUUID(), FUTURE_DATE, START_TIME, "Kham", null)));
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+    }
+
+    @Test
+    void booksAppointmentForLinkedDependentWithOnBehalfAuditContext() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient dependent = mock(Patient.class);
+        when(dependent.getId()).thenReturn(dependentId);
+        when(dependent.getUserId()).thenReturn(null);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(dependent);
+
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, roleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(roleId)));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
+                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0), true)));
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(
+                eq(doctorId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
+        when(appointmentCodeGenerator.generate()).thenReturn("APT000200");
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PatientAppointmentResult result = service.book(
+                new PatientBookAppointmentCommand(
+                        doctorId, FUTURE_DATE, START_TIME, "Kham nhi", dependentId));
+
+        assertEquals(dependentId, result.patientId());
+        verify(patientAccessGuard).requirePatientAccess(dependentId);
+        verify(patientRepository, never()).findByUserId(any());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        JsonNode node = objectMapper.readTree(captor.getValue().getDetail());
+        assertEquals(dependentId.toString(), node.get("patientId").asText());
+        assertEquals(userId.toString(), node.get("bookedByUserId").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                node.get("bookingOnBehalfOfDependent").asBoolean());
+    }
+
+    @Test
+    void rejectsBookingWhenDependentScopeIsNotAuthorised() {
+        UUID userId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientAccessGuard.requirePatientAccess(strangerId))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("denied"));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.book(new PatientBookAppointmentCommand(
+                        doctorId, FUTURE_DATE, START_TIME, "Kham", strangerId)));
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+    }
+
+    @Test
+    void dependentBookingStillEnforcesSlotCollisionRules() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+        UUID doctorId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        when(clockPort.now()).thenReturn(NOW);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+
+        Patient dependent = mock(Patient.class);
+        when(dependent.getId()).thenReturn(dependentId);
+        when(patientAccessGuard.requirePatientAccess(dependentId)).thenReturn(dependent);
+
+        when(userRepository.findByIdForUpdate(doctorId)).thenReturn(Optional.of(doctor(doctorId, roleId)));
+        when(roleRepository.findByName("DOCTOR")).thenReturn(Optional.of(doctorRole(roleId)));
+        when(doctorScheduleRepository.findByDoctorIdAndScheduleDateForUpdate(doctorId, FUTURE_DATE))
+                .thenReturn(Optional.of(schedule(doctorId, FUTURE_DATE, LocalTime.of(8, 0), LocalTime.of(17, 0), true)));
+        when(appointmentRepository.findActiveAppointmentsForDoctorBetween(
+                eq(doctorId), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(mock(Appointment.class)));
+
+        assertThrows(SlotAlreadyBookedException.class, () -> service.book(
+                new PatientBookAppointmentCommand(
+                        doctorId, FUTURE_DATE, START_TIME, "Kham nhi", dependentId)));
+    }
+}

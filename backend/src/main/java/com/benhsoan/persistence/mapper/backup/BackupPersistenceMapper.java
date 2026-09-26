@@ -23,7 +23,8 @@ public class BackupPersistenceMapper {
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
                 entity.getRestoredAt(),
-                entity.getRestoredBy()
+                entity.getRestoredBy(),
+                entity.getFailureReason()
         );
     }
 
@@ -43,6 +44,7 @@ public class BackupPersistenceMapper {
                 .createdAt(domain.getCreatedAt())
                 .restoredAt(domain.getRestoredAt())
                 .restoredBy(domain.getRestoredBy())
+                .failureReason(domain.getFailureReason())
                 .build();
     }
 }

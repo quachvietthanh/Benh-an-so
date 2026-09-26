@@ -90,6 +90,7 @@ class QueueSecurityIntegrationTest {
     @MockitoBean private ReQueueItemUseCase reQueueItemUseCase;
     @MockitoBean private PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
     @MockitoBean private GetQueueHistoryUseCase getQueueHistoryUseCase;
+    @MockitoBean private com.benhsoan.port.inbound.queue.GetQueueDisplayUseCase getQueueDisplayUseCase;
     @MockitoBean private JwtTokenPort jwtTokenPort;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private UserSessionRepository userSessionRepository;
@@ -401,6 +402,26 @@ class QueueSecurityIntegrationTest {
                 .andExpect(jsonPath("$[0].action").value("PRIORITIZED"))
                 .andExpect(jsonPath("$[0].operatorName").value("Pham Mai Lan"))
                 .andExpect(jsonPath("$[0].reason").value("Sốt cao co giật"));
+    }
+
+    @Test
+    void allowsPublicAccessToWaitingRoomDisplayWithoutAuthentication() throws Exception {
+        LocalDate today = LocalDate.of(2026, 9, 24);
+        Instant now = Instant.parse("2026-09-24T08:00:00Z");
+        var board = new com.benhsoan.port.dto.result.WaitingRoomBoardResult(today, now, List.of());
+        when(getQueueDisplayUseCase.getWaitingRoomDisplay(any())).thenReturn(board);
+
+        mockMvc.perform(get("/queues/display")
+                        .param("date", "2026-09-24"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value("2026-09-24"))
+                .andExpect(jsonPath("$.rooms").isArray());
+    }
+
+    @Test
+    void deniesNonGetRequestsToQueueDisplayWithoutAuthentication() throws Exception {
+        mockMvc.perform(post("/queues/display"))
+                .andExpect(status().isUnauthorized());
     }
 }
 

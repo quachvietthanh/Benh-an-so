@@ -22,7 +22,8 @@ public class PatientPortalNotificationPersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getAppointmentId(),
                 entity.getRescheduleLogId(),
-                entity.getClinicalResultId());
+                entity.getClinicalResultId(),
+                entity.getGuardianReviewDependentPatientId());
     }
 
     public PatientPortalNotificationEntity toEntity(PatientPortalNotification domain) {
@@ -40,6 +41,7 @@ public class PatientPortalNotificationPersistenceMapper {
                 .appointmentId(domain.getAppointmentId())
                 .rescheduleLogId(domain.getRescheduleLogId())
                 .clinicalResultId(domain.getClinicalResultId())
+                .guardianReviewDependentPatientId(domain.getGuardianReviewDependentPatientId())
                 .build();
     }
 }

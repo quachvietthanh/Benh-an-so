@@ -1,5 +1,5 @@
 -- =====================================================
--- V96__create_document_print_templates_table.sql
+-- V105__create_document_print_templates_table.sql
 -- NCL-09-CN-008: Cấu hình mẫu in chứng từ
 -- Stores document print template configurations (header logo,
 -- legal info, footer, and field visibility) per document type.

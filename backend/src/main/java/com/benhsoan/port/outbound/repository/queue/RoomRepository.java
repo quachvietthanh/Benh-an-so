@@ -1,5 +1,6 @@
 package com.benhsoan.port.outbound.repository.queue;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,6 +12,8 @@ import com.benhsoan.domain.queue.Room;
 public interface RoomRepository {
 
     Optional<Room> findById(UUID roomId);
+
+    List<Room> findAllById(Iterable<UUID> roomIds);
 
     Room save(Room room);
 

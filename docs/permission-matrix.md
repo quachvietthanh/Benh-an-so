@@ -71,6 +71,9 @@
 | `/api/v1/prescriptions/{id}/interconnection` | POST | ❌ | ✅ | ❌ | ❌ |
 | `/api/v1/prescription-interconnections` | GET | ✅ | ❌ | ❌ | ❌ |
 | `/api/v1/prescriptions/{id}/interconnection/retry` | POST | ✅ | ❌ | ❌ | ❌ |
+| `/api/v1/prescription-reconciliation` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/prescription-reconciliation/{prescriptionId}/notes` | GET | ✅ | ❌ | ❌ | ✅ |
+| `/api/v1/prescription-reconciliation/{prescriptionId}/notes` | POST | ✅ | ❌ | ❌ | ✅ |
 | `/api/v1/prescriptions/check-interactions` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/prescriptions/check-allergy-warnings` | POST | ✅ | ✅ | ❌ | ❌ |
 | `/api/v1/prescriptions/allergy-warning-logs` | GET | ✅ | ❌ | ❌ | ❌ |
@@ -141,7 +144,44 @@
 | `/patient-portal/invoices` | GET | ❌ | ❌ | ❌ | ❌ |
 | `/patient-portal/invoices/{id}` | GET | ❌ | ❌ | ❌ | ❌ |
 | `/patient-portal/invoices/{id}/download` | GET | ❌ | ❌ | ❌ | ❌ |
+| `/patient-portal/patients/linked` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments` | POST | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/appointments/{id}` | GET | ❌ | ❌ | ❌ | ✅ |
+| `/patient-portal/satisfaction-surveys` | POST | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu lượt khám) |
+| `/patient-portal/satisfaction-surveys/{id}` | PUT | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu khảo sát) |
+| `/patient-portal/satisfaction-surveys/by-visit/{visitId}` | GET | ❌ | ❌ | ❌ | ❌ (Chỉ `ROLE_PATIENT` sở hữu lượt khám) |
+| `/patients/{patientId}` | PUT | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ✅ `PATIENT_UPDATE` | ❌ |
 *(Lưu ý: Các endpoint `/patient-portal/**` chỉ dành riêng cho vai trò `ROLE_PATIENT` với dữ liệu thuộc chính mình theo QTN-23)*
+
+**NCL-10-CN-005 — Khảo sát hài lòng sau khám**
+
+| Hạng mục | Chi tiết |
+|---|---|
+| Endpoints mới | `POST /patient-portal/satisfaction-surveys`, `PUT /patient-portal/satisfaction-surveys/{id}`, `GET /patient-portal/satisfaction-surveys/by-visit/{visitId}`, `GET /reports/satisfaction` |
+| Quyền mới | Không thêm permission code mới. Phân hệ báo cáo sử dụng permission `REPORT_VIEW` (đã được cấp cho `ROLE_MANAGER` và `ROLE_ADMIN`). |
+| Phân quyền vận chuyển | `/patient-portal/**` = `hasRole("PATIENT")`; `/reports/**` = `authenticated()` + `@RequirePermission("REPORT_VIEW")`. |
+| Chống gửi trùng | Ràng buộc duy nhất `visit_id` trên DB, chặn tạo mới trả về `409 CONFLICT` (`SATISFACTION_SURVEY_ALREADY_EXISTS`), cho phép chỉnh sửa qua `PUT`. |
+| Phạm vi dữ liệu (Data Scope) | `PatientAccessGuard.requirePatientOwnership(...)` bắt buộc bệnh nhân chỉ khảo sát và xem đánh giá của chính lượt khám của mình (`QTN-23`). |
+
+**NCL-14-CN-010 — Người giám hộ đặt lịch cho bệnh nhân phụ thuộc**
+
+| Hạng mục | Chi tiết |
+|---|---|
+| Endpoint mới | Chỉ `/patient-portal/patients/linked` (GET). Các endpoint còn lại được **mở rộng** bằng tham số tuỳ chọn `patientId`, không thay đổi phân quyền. |
+| Quyền mới | **Không có.** Không thêm permission nào. |
+| Phân quyền vận chuyển | Không đổi: `/patient-portal/**` = `hasRole("PATIENT")`; `/patients/**` = `authenticated()` + `@RequirePermission` ở tầng method. |
+| Phạm vi theo hồ sơ | `PatientAccessGuard.requirePatientAccess(...)` — hồ sơ của chính mình **hoặc** hồ sơ có `patients.guardian_user_id` = id tài khoản đang đăng nhập. |
+| Phạm vi chỉ-chính-mình (không đổi) | `/patient-portal/invoices*`, `/patient-portal/clinical-results*`, `/patient-portal/notifications*`, `/patient-portal/consent*` và `cancel` / `confirm` / `reschedule` — vẫn qua `requirePatientOwnership(...)`. |
+| Gán `guardianUserId` | Chỉ `PUT /patients/{patientId}` với `PATIENT_UPDATE`. Vai trò `PATIENT` có **0 permission grant** (`V27__seed_patient_portal_role.sql`) nên không thể tự gán người giám hộ. |
+
+Chi tiết: `docs/api/patient-portal-family-appointment-contract.md`, `docs/security-review-ncl-14-cn-010.md`.
+|  |  |  |  |  |  |
+| **Reports** |  |  |  |  |  |
+| `/reports/summary` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/visits-timeline` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/top-medicines` | GET | ✅ | ❌ | ❌ | ❌ |
+| `/reports/satisfaction` | GET | ✅ | ❌ (Chỉ ROLE_MANAGER/ADMIN có `REPORT_VIEW`) | ❌ | ❌ |
 |  |  |  |  |  |  |
 | **Admin / System** |  |  |  |  |  |
 | `/api/v1/admin/**` | ALL | ✅ | ❌ | ❌ | ❌ |
@@ -220,6 +260,7 @@ RECORD_CREATE, RECORD_READ, RECORD_UPDATE, RECORD_DELETE, RECORD_UPDATE_STATUS, 
 // Prescription
 PRESCRIPTION_CREATE, PRESCRIPTION_READ, PRESCRIPTION_UPDATE, PRESCRIPTION_DELETE, PRESCRIPTION_UPDATE_STATUS, PRESCRIPTION_PRINT,
 PRESCRIPTION_INTERCONNECTION_SEND, PRESCRIPTION_INTERCONNECTION_READ, PRESCRIPTION_INTERCONNECTION_RETRY,
+PRESCRIPTION_RECONCILIATION_VIEW, PRESCRIPTION_RECONCILIATION_NOTE,
 PRESCRIPTION_ALLERGY_WARNING_VIEW
 
 // Appointment
@@ -250,4 +291,7 @@ PERMISSION_READ
 
 // Medical Queue
 QUEUE_CREATE, QUEUE_CALL_NEXT, QUEUE_UPDATE_STATUS, QUEUE_VIEW, QUEUE_COUNT
+
+// Reporting & Export (NCL-15-CN-007)
+REPORT_VIEW, REPORT_EXPORT, REPORT_UNMASKED_EXPORT
 ```

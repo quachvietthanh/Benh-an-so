@@ -105,4 +105,164 @@ class PatientAccessGuardTest {
 
         verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW, ResourceType.APPOINTMENT, appointmentId);
     }
+
+    // ------------------------------------------------------------------
+    // NCL-14-CN-010 CV-02: family scope (own profile + explicitly linked dependent)
+    // ------------------------------------------------------------------
+
+    private PatientAccessGuard familyGuard() {
+        return new PatientAccessGuard(currentUserPort, patientRepository, denialAuditWriter, clockPort);
+    }
+
+    @Test
+    void requirePatientAccessAllowsOwnPatientWithoutDenialAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(patientId);
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+
+        Patient result = familyGuard().requirePatientAccess(patientId);
+
+        assertEquals(patientId, result.getId());
+        org.mockito.Mockito.verifyNoInteractions(denialAuditWriter);
+    }
+
+    @Test
+    void requirePatientAccessAllowsLinkedDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID ownPatientId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(ownPatientId);
+        Patient dependent = mock(Patient.class);
+        when(dependent.getId()).thenReturn(dependentId);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(patientRepository.findByGuardianUserIdAndId(userId, dependentId))
+                .thenReturn(Optional.of(dependent));
+
+        Patient result = familyGuard().requirePatientAccess(dependentId);
+
+        assertEquals(dependentId, result.getId());
+        org.mockito.Mockito.verifyNoInteractions(denialAuditWriter);
+    }
+
+    @Test
+    void requirePatientAccessDeniesUnrelatedPatientAndWritesDenialAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID ownPatientId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(ownPatientId);
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(patientRepository.findByGuardianUserIdAndId(userId, strangerId))
+                .thenReturn(Optional.empty());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(AccessDeniedException.class, () -> familyGuard().requirePatientAccess(strangerId));
+
+        verify(denialAuditWriter).writeDenied(userId, strangerId, NOW, ResourceType.PATIENT, strangerId);
+    }
+
+    @Test
+    void requirePatientAccessDeniesWhenNoProfileLinkedAndWritesDenialAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID targetPatientId = UUID.randomUUID();
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        when(patientRepository.findByGuardianUserIdAndId(userId, targetPatientId))
+                .thenReturn(Optional.empty());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(AccessDeniedException.class,
+                () -> familyGuard().requirePatientAccess(targetPatientId));
+
+        verify(denialAuditWriter).writeDenied(userId, targetPatientId, NOW, ResourceType.PATIENT, targetPatientId);
+    }
+
+    @Test
+    void dependentLinkedToAnotherGuardianIsNotReachable() {
+        UUID userId = UUID.randomUUID();
+        UUID otherGuardianUserId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(UUID.randomUUID());
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(patientRepository.findByGuardianUserIdAndId(userId, dependentId))
+                .thenReturn(Optional.empty());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(AccessDeniedException.class, () -> familyGuard().requirePatientAccess(dependentId));
+
+        verify(denialAuditWriter).writeDenied(userId, dependentId, NOW, ResourceType.PATIENT, dependentId);
+        org.mockito.Mockito.verify(patientRepository, org.mockito.Mockito.never())
+                .findByGuardianUserIdAndId(otherGuardianUserId, dependentId);
+    }
+
+    @Test
+    void requirePatientAccessReportsResourceScopedDenialAudit() {
+        UUID userId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(UUID.randomUUID());
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(patientRepository.findByGuardianUserIdAndId(userId, dependentId))
+                .thenReturn(Optional.empty());
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(AccessDeniedException.class, () -> familyGuard()
+                .requirePatientAccess(dependentId, ResourceType.APPOINTMENT, appointmentId));
+
+        verify(denialAuditWriter)
+                .writeDenied(userId, dependentId, NOW, ResourceType.APPOINTMENT, appointmentId);
+    }
+
+    @Test
+    void requirePatientOwnershipStillDeniesALinkedDependent() {
+        UUID userId = UUID.randomUUID();
+        UUID dependentId = UUID.randomUUID();
+
+        Patient own = mock(Patient.class);
+        when(own.getId()).thenReturn(UUID.randomUUID());
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(patientRepository.findByUserId(userId)).thenReturn(Optional.of(own));
+        when(clockPort.now()).thenReturn(NOW);
+
+        assertThrows(AccessDeniedException.class,
+                () -> familyGuard().requirePatientOwnership(dependentId));
+
+        verify(denialAuditWriter).writeDenied(userId, dependentId, NOW, ResourceType.PATIENT, dependentId);
+    }
+
+    @Test
+    void denyPatientAccessWritesDenialAuditForTheResolvedOwner() {
+        UUID userId = UUID.randomUUID();
+        UUID ownerPatientId = UUID.randomUUID();
+        UUID appointmentId = UUID.randomUUID();
+
+        when(currentUserPort.getCurrentUserId()).thenReturn(userId);
+        when(clockPort.now()).thenReturn(NOW);
+
+        familyGuard().denyPatientAccess(ownerPatientId, ResourceType.APPOINTMENT, appointmentId);
+
+        verify(denialAuditWriter)
+                .writeDenied(userId, ownerPatientId, NOW, ResourceType.APPOINTMENT, appointmentId);
+    }
 }
