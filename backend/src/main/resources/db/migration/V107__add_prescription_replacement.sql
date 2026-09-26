@@ -1,5 +1,5 @@
 -- =====================================================
--- V106__add_prescription_replacement.sql
+-- V107__add_prescription_replacement.sql
 -- NCL-12-CN-008: replace an interconnected prescription.
 -- Additive only; existing rows keep NULL replacement columns and their
 -- interconnection state.

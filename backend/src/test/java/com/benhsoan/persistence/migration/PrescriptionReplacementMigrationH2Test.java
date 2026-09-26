@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test;
 
 class PrescriptionReplacementMigrationH2Test {
 
-    private static final String MIGRATION = "db/migration/V106__add_prescription_replacement.sql";
+    private static final String MIGRATION = "db/migration/V107__add_prescription_replacement.sql";
 
     @Test
-    void v106AcceptsReplacedStatusAndPersistsTheReplacementLink() throws Exception {
-        try (Connection conn = migratedDatabase("v106_link")) {
+    void v107AcceptsReplacedStatusAndPersistsTheReplacementLink() throws Exception {
+        try (Connection conn = migratedDatabase("v107_link")) {
             UUID originalId = UUID.randomUUID();
             UUID replacementId = UUID.randomUUID();
 
@@ -45,8 +45,8 @@ class PrescriptionReplacementMigrationH2Test {
     }
 
     @Test
-    void v106RejectsASecondReplacementOfTheSameOriginal() throws Exception {
-        try (Connection conn = migratedDatabase("v106_unique")) {
+    void v107RejectsASecondReplacementOfTheSameOriginal() throws Exception {
+        try (Connection conn = migratedDatabase("v107_unique")) {
             UUID originalId = UUID.randomUUID();
             insertPrescription(conn, originalId, "RX000001", "REPLACED", null, null, null);
             insertReplacement(conn, UUID.randomUUID(), "RX000002", originalId, "RX000001", "Sai liều lượng");
@@ -57,8 +57,8 @@ class PrescriptionReplacementMigrationH2Test {
     }
 
     @Test
-    void v106RejectsSelfReplacement() throws Exception {
-        try (Connection conn = migratedDatabase("v106_self")) {
+    void v107RejectsSelfReplacement() throws Exception {
+        try (Connection conn = migratedDatabase("v107_self")) {
             UUID prescriptionId = UUID.randomUUID();
 
             assertThrows(SQLException.class, () -> insertReplacement(
@@ -67,8 +67,8 @@ class PrescriptionReplacementMigrationH2Test {
     }
 
     @Test
-    void v106RequiresAnOriginalCodeAndAReasonForALinkedReplacement() throws Exception {
-        try (Connection conn = migratedDatabase("v106_reason")) {
+    void v107RequiresAnOriginalCodeAndAReasonForALinkedReplacement() throws Exception {
+        try (Connection conn = migratedDatabase("v107_reason")) {
             UUID originalId = UUID.randomUUID();
             insertPrescription(conn, originalId, "RX000001", "REPLACED", null, null, null);
 
@@ -80,24 +80,24 @@ class PrescriptionReplacementMigrationH2Test {
     }
 
     @Test
-    void v106RejectsALinkToAnUnknownPrescription() throws Exception {
-        try (Connection conn = migratedDatabase("v106_fk")) {
+    void v107RejectsALinkToAnUnknownPrescription() throws Exception {
+        try (Connection conn = migratedDatabase("v107_fk")) {
             assertThrows(SQLException.class, () -> insertReplacement(
                     conn, UUID.randomUUID(), "RX000002", UUID.randomUUID(), "RX000001", "Sai liều lượng"));
         }
     }
 
     @Test
-    void v106RejectsAnUnknownStatusValue() throws Exception {
-        try (Connection conn = migratedDatabase("v106_status")) {
+    void v107RejectsAnUnknownStatusValue() throws Exception {
+        try (Connection conn = migratedDatabase("v107_status")) {
             assertThrows(SQLException.class, () -> insertPrescription(
                     conn, UUID.randomUUID(), "RX000002", "SUPERSEDED", null, null, null));
         }
     }
 
     @Test
-    void v106CascadesPrescriptionHistoryWhenTheMedicalRecordIsDeleted() throws Exception {
-        try (Connection conn = migratedDatabase("v106_cascade")) {
+    void v107CascadesPrescriptionHistoryWhenTheMedicalRecordIsDeleted() throws Exception {
+        try (Connection conn = migratedDatabase("v107_cascade")) {
             UUID originalId = UUID.randomUUID();
             UUID replacementId = UUID.randomUUID();
             insertPrescription(conn, originalId, "RX000001", "REPLACED", null, null, null);

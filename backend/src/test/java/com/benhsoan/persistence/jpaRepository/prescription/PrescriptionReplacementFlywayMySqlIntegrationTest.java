@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "logging.level.org.hibernate.SQL=WARN",
         "logging.level.org.hibernate.orm.jdbc.bind=WARN"
 })
-@DisplayName("Prescription replacement Flyway MySQL Integration Tests (V106)")
+@DisplayName("Prescription replacement Flyway MySQL Integration Tests (V107)")
 class PrescriptionReplacementFlywayMySqlIntegrationTest {
 
     private static final String SEEDED_PENDING_PRESCRIPTION_ID = "16200000-0000-0000-0000-000000000005";
@@ -44,7 +44,7 @@ class PrescriptionReplacementFlywayMySqlIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    @DisplayName("MySQL V106: chk_prescriptions_status chấp nhận REPLACED")
+    @DisplayName("MySQL V107: chk_prescriptions_status chấp nhận REPLACED")
     void checkConstraintAcceptsReplaced() {
         Integer constraintCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.check_constraints "
@@ -69,7 +69,7 @@ class PrescriptionReplacementFlywayMySqlIntegrationTest {
     }
 
     @Test
-    @DisplayName("MySQL V106: replacement columns, unique link and cascade delete rule exist")
+    @DisplayName("MySQL V107: replacement columns, unique link and cascade delete rule exist")
     void replacementSchemaIsApplied() {
         Integer columnCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns "
