@@ -43,6 +43,7 @@ const DiagnosisCatalogPage = React.lazy(() => import('../pages/DiagnosisCatalogP
 const ClinicalServiceManagementPage = React.lazy(() => import('../pages/ClinicalServiceManagementPage'))
 const MedicalRecordTemplateManagementPage = React.lazy(() => import('../pages/MedicalRecordTemplateManagementPage'))
 const SpecialtyManagementPage = React.lazy(() => import('../pages/SpecialtyManagementPage'))
+const SessionManagementPage = React.lazy(() => import('../pages/SessionManagementPage'))
 const BackupRestorePage = React.lazy(() => import('../pages/BackupRestorePage'))
 
 const MedicalRecordAccessLogsPage = React.lazy(() => import('../pages/MedicalRecordAccessLogsPage'))
@@ -213,6 +214,8 @@ function AppRoutes() {
         <Route path="prescription-interconnections" element={<PrivateRoute allowedPermissions={['PRESCRIPTION_INTERCONNECTION_READ']} allowedRoles={['admin']}><LazyPage><PrescriptionInterconnectionPage /></LazyPage></PrivateRoute>} />
         <Route path="system/anonymization" element={<PrivateRoute allowedPermissions={['SYSTEM_CONFIG_READ']} allowedRoles={['admin']}><LazyPage><AnonymizationPage /></LazyPage></PrivateRoute>} />
         <Route path="anonymization" element={<Navigate to="/system/anonymization" replace />} />
+        <Route path="admin/sessions" element={<PrivateRoute allowedPermissions={['SESSION_READ']} allowedRoles={['admin']}><LazyPage><SessionManagementPage /></LazyPage></PrivateRoute>} />
+        <Route path="sessions" element={<Navigate to="/admin/sessions" replace />} />
         <Route path="admin/operation-logs" element={<PrivateRoute allowedPermissions={['ADMIN_OPERATION_LOG_READ']} allowedRoles={['admin', 'manager', 'clinic_manager']}><LazyPage><AdminOperationLogPage /></LazyPage></PrivateRoute>} />
         <Route path="admin-operation-logs" element={<Navigate to="/admin/operation-logs" replace />} />
         <Route path="contraindication-rules" element={<PrivateRoute allowedPermissions={['CONTRAINDICATION_RULE_MANAGE']}><LazyPage><ContraindicationRuleManagementPage /></LazyPage></PrivateRoute>} />
