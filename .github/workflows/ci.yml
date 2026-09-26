@@ -45,6 +45,7 @@ jobs:
         working-directory: backend
         run: |
           chmod +x mvnw || true
+          ls -la .mvn/wrapper/ || true
 
       - name: Run Backend Unit & Integration Tests
         working-directory: backend
@@ -52,12 +53,22 @@ jobs:
           SPRING_PROFILES_ACTIVE: test
           TESTCONTAINERS_RYUK_DISABLED: "false"
         run: |
-          ./mvnw -B -ntp clean test
+          if [ -f "./mvnw" ] && [ -f "./.mvn/wrapper/maven-wrapper.properties" ]; then
+            ./mvnw -B -ntp clean test
+          else
+            echo "Falling back to system maven..."
+            mvn -B -ntp clean test
+          fi
 
       - name: Package Backend Application (Executable JAR)
         working-directory: backend
         run: |
-          ./mvnw -B -ntp package -DskipTests
+          if [ -f "./mvnw" ] && [ -f "./.mvn/wrapper/maven-wrapper.properties" ]; then
+            ./mvnw -B -ntp package -DskipTests
+          else
+            echo "Falling back to system maven..."
+            mvn -B -ntp package -DskipTests
+          fi
 
       - name: Upload Surefire Test Reports
         if: always()
