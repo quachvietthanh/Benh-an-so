@@ -25,6 +25,7 @@ import {
   PrinterOutlined,
   FileExcelOutlined,
   PercentageOutlined,
+  SafetyCertificateOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons'
 
@@ -44,7 +45,7 @@ export const navigationSections = [
   { key: 'pharmacy', label: 'Nhà thuốc', paths: ['/pharmacy', '/medicines', '/pharmacy/receipts', '/inventory/stock-report', '/pharmacy/special-control-register', '/pharmacy/procurement-plans'] },
   { key: 'finance', label: 'Tài chính', paths: ['/billing', '/invoices/lookup', '/cashier-shifts/close', '/cashier-shifts/history', '/invoices/discount-requests'] },
   { key: 'reports', label: 'Báo cáo', paths: ['/reports', '/reports/disease-patterns', '/reports/revenue-breakdown', '/reports/appointment-effectiveness'] },
-  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/specialties', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization', '/contraindication-rules'] },
+  { key: 'system', label: 'Hệ thống & Bảng giá', paths: ['/users', '/services', '/system/specialties', '/system/clinical-services', '/system/diagnosis-catalog', '/system/medical-record-templates', '/system-management', '/admin/operation-logs', '/prescription-interconnections', '/system/anonymization', '/contraindication-rules', '/admin/sessions'] },
 ]
 
 export const getNavigationItems = (rolesOrUser = [], permissionsArg = []) => {
@@ -108,6 +109,7 @@ export const getNavigationItems = (rolesOrUser = [], permissionsArg = []) => {
     { key: '/system/specialties', label: 'Danh mục chuyên khoa & phòng khám', icon: MedicineBoxOutlined, check: () => hasPerm('SPECIALTY_MANAGE') || isAdmin },
     { key: '/system-management', label: 'Quản trị hệ thống', icon: SettingOutlined, check: () => isAdmin },
     { key: '/admin/operation-logs', label: 'Nhật ký thao tác', icon: AuditOutlined, check: () => !isDoctor && !isReceptionist && !isPharmacist && (isAdmin || isManager || hasPerm('ADMIN_OPERATION_LOG_READ')) },
+    { key: '/admin/sessions', label: 'Quản lý phiên làm việc', icon: SafetyCertificateOutlined, check: () => hasPerm('SESSION_READ') || isAdmin },
     { key: '/prescription-interconnections', label: 'Liên thông đơn thuốc', icon: CloudServerOutlined, check: () => hasPerm('PRESCRIPTION_INTERCONNECTION_READ') || isAdmin },
     { key: '/system/anonymization', label: 'Chế độ ẩn danh dữ liệu', icon: EyeInvisibleOutlined, check: () => hasPerm('SYSTEM_CONFIG_READ') || isAdmin },
     { key: '/contraindication-rules', label: 'Quy tắc chống chỉ định', icon: MedicineBoxOutlined, check: () => hasPerm('CONTRAINDICATION_RULE_MANAGE') || isAdmin },
