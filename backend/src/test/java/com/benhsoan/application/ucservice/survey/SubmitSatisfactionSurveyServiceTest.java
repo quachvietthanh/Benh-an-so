@@ -23,7 +23,6 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.benhsoan.application.ucservice.patient.PatientAccessGuard;
 import com.benhsoan.domain.auditlog.AuditLog;
-import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.survey.PatientSatisfactionSurvey;

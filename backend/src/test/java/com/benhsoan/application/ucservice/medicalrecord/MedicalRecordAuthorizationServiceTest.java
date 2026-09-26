@@ -17,7 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.benhsoan.domain.medicalrecord.MedicalRecord;
-import com.benhsoan.domain.medicalrecord.enums.MedicalRecordStatus;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordAccessDeniedException;
 import com.benhsoan.domain.medicalrecord.exception.MedicalRecordArchivedReadOnlyException;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;

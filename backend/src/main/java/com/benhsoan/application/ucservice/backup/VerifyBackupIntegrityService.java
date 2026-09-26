@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.backup.BackupRecord;
-import com.benhsoan.domain.backup.BackupScheduleConfiguration;
 import com.benhsoan.domain.backup.BackupVerificationReport;
 import com.benhsoan.domain.backup.enums.BackupStatus;
 import com.benhsoan.domain.backup.exception.BackupNotFoundException;

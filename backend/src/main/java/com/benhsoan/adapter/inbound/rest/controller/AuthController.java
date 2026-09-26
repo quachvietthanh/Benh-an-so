@@ -33,7 +33,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/auth")
@@ -49,10 +48,8 @@ public class AuthController {
     private final com.benhsoan.port.outbound.security.CurrentUserPort currentUserPort;
     private final AuthRestMapper authRestMapper;
 
-    @Autowired(required = false)
     private ExtendSessionUseCase extendSessionUseCase;
 
-    @Autowired(required = false)
     private com.benhsoan.adapter.inbound.rest.mapper.SessionRestMapper sessionRestMapper;
 
     public AuthController(

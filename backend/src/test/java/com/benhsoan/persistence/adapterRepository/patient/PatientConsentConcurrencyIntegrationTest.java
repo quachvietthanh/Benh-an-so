@@ -1,7 +1,6 @@
 package com.benhsoan.persistence.adapterRepository.patient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.LocalDate;

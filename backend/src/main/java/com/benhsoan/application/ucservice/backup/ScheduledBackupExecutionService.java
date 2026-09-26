@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.backup.BackupRecord;
 import com.benhsoan.domain.backup.BackupScheduleConfiguration;
-import com.benhsoan.domain.backup.enums.BackupStatus;
 import com.benhsoan.domain.backup.enums.BackupType;
 import com.benhsoan.domain.backup.exception.BackupExecutionException;
 import com.benhsoan.port.dto.result.BackupResult;

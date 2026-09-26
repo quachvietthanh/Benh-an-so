@@ -27,7 +27,6 @@ import com.benhsoan.exception.GlobalExceptionHandler;
 import com.benhsoan.infrastructure.authSecurity.JwtAuthenticationFilter;
 import com.benhsoan.infrastructure.security.annotation.RequirePermissionAspect;
 import com.benhsoan.infrastructure.security.service.PermissionEvaluator;
-import com.benhsoan.port.dto.result.ControlledMedicineRegisterResult;
 import com.benhsoan.port.inbound.controlledmedicine.SearchControlledMedicineRegisterUseCase;
 import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;

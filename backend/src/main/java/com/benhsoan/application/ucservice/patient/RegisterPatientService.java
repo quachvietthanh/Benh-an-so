@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +20,6 @@ import com.benhsoan.domain.patient.enums.PatientChangeAction;
 import com.benhsoan.domain.patient.exception.PatientAlreadyExistsException;
 import com.benhsoan.domain.patient.exception.PatientConsentRequiredException;
 import com.benhsoan.domain.shared.exception.ValidationException;
-import java.util.regex.Pattern;
 import com.benhsoan.port.dto.command.patient.RegisterPatientCommand;
 import com.benhsoan.port.dto.result.PatientResult;
 import com.benhsoan.port.inbound.patient.RegisterPatientUseCase;
@@ -30,10 +28,6 @@ import com.benhsoan.port.outbound.repository.patient.PatientRepository;
 import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
 import com.benhsoan.port.outbound.repository.patient.PatientChangeLogRepository;
 import com.benhsoan.port.outbound.security.CurrentUserPort;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
@@ -61,7 +55,6 @@ public class RegisterPatientService
 
     private final ObjectMapper objectMapper;
 
-    @Autowired
     public RegisterPatientService(
             PatientRepository patientRepository,
             PatientChangeLogRepository patientChangeLogRepository,

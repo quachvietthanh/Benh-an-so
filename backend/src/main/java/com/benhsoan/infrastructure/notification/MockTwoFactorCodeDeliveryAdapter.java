@@ -45,11 +45,4 @@ public class MockTwoFactorCodeDeliveryAdapter implements TwoFactorCodeDeliveryPo
     public void clear() {
         lastSentCodes.clear();
     }
-
-    private String maskUsername(String username) {
-        if (username == null || username.length() < 4) {
-            return "[REDACTED]";
-        }
-        return username.charAt(0) + "****" + username.charAt(username.length() - 1);
-    }
 }

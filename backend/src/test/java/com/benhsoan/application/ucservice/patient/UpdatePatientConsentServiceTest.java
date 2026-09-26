@@ -31,7 +31,6 @@ import com.benhsoan.domain.auditlog.enums.ActionType;
 import com.benhsoan.domain.auditlog.enums.ResourceType;
 import com.benhsoan.domain.patient.enums.Gender;
 import com.benhsoan.domain.patient.Patient;
-import com.benhsoan.domain.patient.PatientChangeLog;
 import com.benhsoan.domain.patient.PatientConsentRecord;
 import com.benhsoan.domain.patient.enums.BloodType;
 import com.benhsoan.domain.patient.enums.ConsentHistoryStatus;

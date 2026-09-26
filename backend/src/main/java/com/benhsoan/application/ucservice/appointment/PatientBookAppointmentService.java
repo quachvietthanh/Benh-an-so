@@ -50,7 +50,6 @@ import com.benhsoan.port.outbound.repository.appointment.DoctorWeeklyScheduleRep
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import lombok.RequiredArgsConstructor;
 
 /**
  * NCL-14-CN-003 CV-03: books an appointment on behalf of the authenticated patient via the

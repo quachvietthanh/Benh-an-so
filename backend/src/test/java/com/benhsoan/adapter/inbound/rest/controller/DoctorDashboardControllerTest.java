@@ -6,9 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -72,7 +70,6 @@ class DoctorDashboardControllerTest {
     @Test
     @DisplayName("GET /dashboard/doctor trả về HTTP 200 và dữ liệu JSON theo đúng contract")
     void returnsDoctorDashboard() throws Exception {
-        UUID doctorId = UUID.randomUUID();
         UUID apptId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
         UUID mrId = UUID.randomUUID();

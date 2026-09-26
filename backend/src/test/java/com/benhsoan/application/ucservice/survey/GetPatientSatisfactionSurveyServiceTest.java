@@ -28,7 +28,6 @@ import com.benhsoan.domain.survey.exception.SatisfactionSurveyNotFoundException;
 import com.benhsoan.domain.visit.Visit;
 import com.benhsoan.domain.visit.enums.VisitStatus;
 import com.benhsoan.domain.visit.enums.VisitType;
-import com.benhsoan.domain.visit.exception.VisitNotFoundException;
 import com.benhsoan.port.dto.result.survey.SatisfactionSurveyResult;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
 import com.benhsoan.port.outbound.repository.survey.SatisfactionSurveyRepository;

@@ -1,7 +1,6 @@
 package com.benhsoan.application.ucservice.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +27,6 @@ import org.springframework.data.domain.Pageable;
 import com.benhsoan.domain.auth.Role;
 import com.benhsoan.domain.auth.User;
 import com.benhsoan.domain.auth.UserSession;
-import com.benhsoan.domain.clinic.ClinicConfiguration;
 import com.benhsoan.port.dto.result.auth.ActiveSessionResult;
 import com.benhsoan.port.outbound.repository.auth.RoleRepository;
 import com.benhsoan.port.outbound.repository.auth.UserRepository;
