@@ -49,6 +49,7 @@ import com.benhsoan.port.inbound.prescription.DispensePrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.ExportPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetDispenseSuggestionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionAllergyWarningLogsUseCase;
+import com.benhsoan.port.inbound.prescription.GetPrescriptionByCodeUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionDispenseHistoryUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionUseCase;
 import com.benhsoan.port.inbound.prescription.GetPrescriptionsByMedicalRecordUseCase;
@@ -97,6 +98,7 @@ class PrescriptionInterconnectionRetryAuthorizationRegressionTest {
     @MockitoBean private CreatePrescriptionUseCase createPrescriptionUseCase;
     @MockitoBean private AmendPrescriptionUseCase amendPrescriptionUseCase;
     @MockitoBean private GetPrescriptionUseCase getPrescriptionUseCase;
+    @MockitoBean private GetPrescriptionByCodeUseCase getPrescriptionByCodeUseCase;
     @MockitoBean private GetPrescriptionsByMedicalRecordUseCase getPrescriptionsByMedicalRecordUseCase;
     @MockitoBean private SearchPrescriptionsUseCase searchPrescriptionsUseCase;
     @MockitoBean private DispensePrescriptionUseCase dispensePrescriptionUseCase;
