@@ -1,0 +1,52 @@
+package com.benhsoan.persistence.entity.medicalrecord;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(
+        name = "diagnosis_catalog",
+        uniqueConstraints = @UniqueConstraint(name = "uk_diagnosis_catalog_code", columnNames = "code")
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class DiagnosisCatalogEntity {
+
+    @Id
+    @Column(columnDefinition = "BINARY(16)")
+    UUID id;
+    @Column(nullable = false, length = 30)
+    String code;
+    @Column(nullable = false, length = 150)
+    String name;
+    @Column(name = "name_norm", length = 150)
+    String nameNorm;
+    @Column(length = 50)
+    String abbreviation;
+    @Column(name = "abbreviation_norm", length = 50)
+    String abbreviationNorm;
+    @Column(name = "disease_group", nullable = false, length = 100)
+    String diseaseGroup;
+    @Column(columnDefinition = "TEXT")
+    String description;
+    @Column(nullable = false)
+    boolean active;
+    @Column(name = "created_at", nullable = false)
+    Instant createdAt;
+    @Column(name = "updated_at")
+    Instant updatedAt;
+}

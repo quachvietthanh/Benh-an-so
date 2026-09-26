@@ -1,0 +1,404 @@
+package com.benhsoan.exception;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import com.benhsoan.domain.druginteraction.enums.InteractionSeverity;
+import com.benhsoan.domain.prescription.exception.PrescriptionInsufficientStockException;
+import com.benhsoan.domain.prescription.exception.PrescriptionInteractionConfirmationRequiredException;
+import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
+import com.benhsoan.domain.clinical.exception.ClinicalAttachmentNotFoundException;
+import com.benhsoan.domain.clinical.exception.ClinicalResultNotFoundException;
+import com.benhsoan.domain.queue.exception.DoctorNotAssignedToRoomException;
+import com.benhsoan.domain.reporting.exception.OperationalReportDataEmptyException;
+import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.servicecatalog.exception.ServiceCatalogNotFoundException;
+import com.benhsoan.infrastructure.pdf.PdfRenderingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+class GlobalExceptionHandlerTest {
+
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    private MockHttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        request = new MockHttpServletRequest(HttpMethod.POST.name(), "/api/test-resource");
+    }
+
+    @Test
+    void returnsNotFoundForMissingRouteInsteadOfInternalServerError() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.GET.name(), "/api/v1/medical-records");
+
+        var response = handler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.GET, "/medical-records"), request
+        );
+
+        assertEquals(404, response.getStatusCode().value());
+        assertEquals("Resource not found.", response.getBody().message());
+    }
+
+    @Test
+    void returnsStructuredConflictForInsufficientStock() {
+        UUID prescriptionId = UUID.randomUUID();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                HttpMethod.POST.name(),
+                "/prescriptions/" + prescriptionId + "/dispense"
+        );
+
+        var response = handler.handleInsufficientStock(
+                new PrescriptionInsufficientStockException(
+                        prescriptionId,
+                        List.of(new PrescriptionInsufficientStockException.StockShortageDetail(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                "MED-001",
+                                "Paracetamol",
+                                20,
+                                5,
+                                15
+                        ))
+                ),
+                request
+        );
+
+        assertEquals(409, response.getStatusCode().value());
+        assertEquals(409, response.getBody().status());
+        assertEquals("Conflict", response.getBody().error());
+        assertEquals("INSUFFICIENT_STOCK", response.getBody().code());
+        assertEquals(request.getRequestURI(), response.getBody().path());
+        assertEquals(prescriptionId, response.getBody().details().get("prescriptionId"));
+        var shortages = (List<?>) response.getBody().details().get("shortages");
+        assertEquals(1, shortages.size());
+        assertEquals(15, ((java.util.Map<?, ?>) shortages.getFirst()).get("shortageQuantity"));
+    }
+
+    @Test
+    void returnsStructuredUnprocessableContentForEmptyOperationalReport() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.GET.name(), "/reports/export");
+
+        var response = handler.handleOperationalReportDataEmpty(
+                new OperationalReportDataEmptyException(), request
+        );
+
+        assertEquals(422, response.getStatusCode().value());
+        assertEquals("REPORT_DATA_EMPTY", response.getBody().code());
+        assertEquals("No report data available for the selected period.", response.getBody().message());
+        assertEquals(request.getRequestURI(), response.getBody().path());
+    }
+
+    @Test
+    void returnsTheExplicitStableCodeForDomainExceptions() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleDomainException(new ValidationException("Patient name is required."), request);
+
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+    }
+
+    @Test
+    void mapsValidationExceptionWithFieldPrefixToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertEquals("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.", response.getBody().message());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
+    void mapsValidationExceptionWithStructuredFieldToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertEquals("emergencyPhone: Số điện thoại người liên hệ khẩn cấp không đúng định dạng.", response.getBody().message());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of("emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
+    void mapsValidationExceptionWithMultipleFieldsToDetailsFields() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/patients");
+
+        var response = handler.handleValidationException(
+                new ValidationException(
+                        Map.of(
+                                "emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.",
+                                "emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."
+                        ),
+                        "Validation failed for emergency contact."
+                ),
+                request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("VALIDATION_FAILED", response.getBody().code());
+        assertNotNull(response.getBody().details());
+        assertEquals(
+                Map.of(
+                        "emergencyContact", "Họ tên người liên hệ khẩn cấp không được để trống.",
+                        "emergencyPhone", "Số điện thoại người liên hệ khẩn cấp không đúng định dạng."
+                ),
+                response.getBody().details().get("fields")
+        );
+    }
+
+    @Test
+    void mapsAuthenticationAndBusinessPreconditionExceptionsToTheirSemanticStatuses() {
+        MockHttpServletRequest request = new MockHttpServletRequest(HttpMethod.POST.name(), "/auth/login");
+
+        var invalidCredentials = handler.handleDomainException(new InvalidCredentialsException(), request);
+        var doctorNotAssigned = handler.handleDomainException(
+                new DoctorNotAssignedToRoomException(UUID.randomUUID()), request);
+        var missingDiagnosis = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordMissingDiagnosisException(UUID.randomUUID()), request);
+        var unauthorizedSigner = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordUnauthorizedSignerException(UUID.randomUUID(), UUID.randomUUID()), request);
+        var notSigned = handler.handleDomainException(
+                new com.benhsoan.domain.medicalrecord.exception.MedicalRecordNotSignedException(UUID.randomUUID()), request);
+
+        assertEquals(401, invalidCredentials.getStatusCode().value());
+        assertEquals("INVALID_CREDENTIALS", invalidCredentials.getBody().code());
+        assertEquals(409, doctorNotAssigned.getStatusCode().value());
+        assertEquals("DOCTOR_NOT_ASSIGNED_TO_ROOM", doctorNotAssigned.getBody().code());
+        assertEquals(400, missingDiagnosis.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_MISSING_DIAGNOSIS", missingDiagnosis.getBody().code());
+        assertEquals(403, unauthorizedSigner.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_UNAUTHORIZED_SIGNER", unauthorizedSigner.getBody().code());
+        assertEquals(400, notSigned.getStatusCode().value());
+        assertEquals("MEDICAL_RECORD_NOT_SIGNED", notSigned.getBody().code());
+    }
+
+    @Test
+    void mapsNewRequestedResourceExceptionsToNotFound() {
+        var clinicalResult = handler.handleDomainException(new ClinicalResultNotFoundException(UUID.randomUUID()), request);
+        var attachment = handler.handleDomainException(new ClinicalAttachmentNotFoundException(UUID.randomUUID()), request);
+        var serviceCatalog = handler.handleDomainException(new ServiceCatalogNotFoundException(UUID.randomUUID()), request);
+
+        assertEquals(404, clinicalResult.getStatusCode().value());
+        assertEquals("CLINICAL_RESULT_NOT_FOUND", clinicalResult.getBody().code());
+        assertEquals(404, attachment.getStatusCode().value());
+        assertEquals("CLINICAL_ATTACHMENT_NOT_FOUND", attachment.getBody().code());
+        assertEquals(404, serviceCatalog.getStatusCode().value());
+        assertEquals("SERVICE_CATALOG_NOT_FOUND", serviceCatalog.getBody().code());
+    }
+
+    @Test
+    void returnsCommonContractForBeanValidationErrors() {
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "request");
+        bindingResult.addError(new FieldError("request", "patient.name", "Patient name is required."));
+        bindingResult.addError(new FieldError("request", "quantity", "Quantity must be positive."));
+
+        var body = assertContract(handler.handleValidation(
+                new MethodArgumentNotValidException(null, bindingResult), request), 400, "VALIDATION_FAILED");
+
+        assertEquals(Map.of(
+                "patient.name", "Patient name is required.",
+                "quantity", "Quantity must be positive."), body.details().get("fields"));
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void returnsNestedFieldPathForJsonTypeErrors() {
+        JsonMappingException mappingException = JsonMappingException.from(
+                (com.fasterxml.jackson.core.JsonParser) null, "Invalid numeric value.");
+        mappingException.prependPath(new Object(), "dosage");
+        mappingException.prependPath(new Object(), 2);
+        mappingException.prependPath(new Object(), "items");
+
+        var body = assertContract(handler.handleUnreadable(
+                new HttpMessageNotReadableException("Unreadable JSON", mappingException), request),
+                400, "VALIDATION_FAILED");
+
+        assertEquals(Map.of("items[2].dosage", "Invalid value."), body.details().get("fields"));
+    }
+
+    @Test
+    void returnsCommonContractForAuthenticationAndAuthorization() {
+        var authentication = assertContract(handler.handleAuthentication(
+                new AuthenticationException("Token rejected") { }, request), 401, "AUTHENTICATION_FAILED");
+        var authorization = assertContract(handler.handleAccessDenied(
+                new org.springframework.security.access.AccessDeniedException("Denied"), request),
+                403, "ACCESS_DENIED");
+
+        assertEquals("Token rejected", authentication.message());
+        assertEquals("Access denied.", authorization.message());
+    }
+
+    @Test
+    void returnsCommonContractForUploadErrors() {
+        var missingPart = assertContract(handler.handleMissingRequestPart(
+                new MissingServletRequestPartException("file"), request), 400, "MISSING_REQUEST_PART");
+        var tooLarge = assertContract(handler.handleUploadTooLarge(
+                new MaxUploadSizeExceededException(1_024), request), 413, "PAYLOAD_TOO_LARGE");
+
+        assertEquals("file is required.", missingPart.message());
+        assertEquals("Uploaded file exceeds the allowed size.", tooLarge.message());
+    }
+
+    @Test
+    void hidesInfrastructureCausesBehindTheCommonInternalErrorContract() {
+        var body = assertContract(handler.handleUnknown(new PdfRenderingException(
+                "Unable to generate prescription PDF.", new IOException("disk path: /secret/output")), request),
+                500, "INTERNAL_SERVER_ERROR");
+
+        assertEquals("Internal server error.", body.message());
+        assertFalse(body.message().contains("secret"));
+        assertFalse(body.details().containsKey("cause"));
+    }
+
+    @Test
+    void preservesCodeAndStructuredDetailsForSpecializedBusinessErrors() {
+        UUID prescriptionId = UUID.randomUUID();
+        var stock = assertContract(handler.handleInsufficientStock(new PrescriptionInsufficientStockException(
+                prescriptionId,
+                List.of(new PrescriptionInsufficientStockException.StockShortageDetail(
+                        UUID.randomUUID(), UUID.randomUUID(), "MED-001", "Paracetamol", 10, 3, 7))), request),
+                409, "INSUFFICIENT_STOCK");
+        var interaction = assertContract(handler.handleInteractionConfirmationRequired(
+                new PrescriptionInteractionConfirmationRequiredException(List.of(
+                        new PrescriptionInteractionConfirmationRequiredException.InteractionWarning(
+                                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                                InteractionSeverity.SEVERE, "Interaction", "Confirm override"))), request),
+                409, "INTERACTION_CONFIRMATION_REQUIRED");
+
+        assertEquals(prescriptionId, stock.details().get("prescriptionId"));
+        assertEquals(7, ((Map<?, ?>) ((List<?>) stock.details().get("shortages")).getFirst()).get("shortageQuantity"));
+        assertEquals(InteractionSeverity.SEVERE,
+                ((Map<?, ?>) ((List<?>) interaction.details().get("warnings")).getFirst()).get("severity"));
+    }
+
+    @Test
+    void returns429WithRetryAfterForTooManyLoginAttempts() {
+        TooManyLoginAttemptsException ex =
+                new TooManyLoginAttemptsException(30, Instant.now().plusSeconds(30));
+
+        var response = handler.handleTooManyLoginAttempts(ex, request);
+
+        assertEquals(429, response.getStatusCode().value());
+        assertEquals("30", response.getHeaders().getFirst("Retry-After"));
+        assertEquals(30L, ((Number) response.getBody().details().get("retryAfterSeconds")).longValue());
+    }
+
+    @Test
+    void returnsStructuredBadRequestForIllegalArgumentException() {
+        var response = handler.handleIllegalArgument(
+                new IllegalArgumentException("Queue number must be positive."), request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("INVALID_ARGUMENT", response.getBody().code());
+        assertEquals("Queue number must be positive.", response.getBody().message());
+    }
+
+    @Test
+    void preservesCustomMessageWhenProvidedInAccessDeniedException() {
+        var response = handler.handleAccessDenied(
+                new org.springframework.security.access.AccessDeniedException("Only the prescribing doctor can cancel a prescription."), request
+        );
+
+        assertEquals(403, response.getStatusCode().value());
+        assertEquals("ACCESS_DENIED", response.getBody().code());
+        assertEquals("Only the prescribing doctor can cancel a prescription.", response.getBody().message());
+    }
+
+    @Test
+    void mapsPrescriptionNoChangesToBadRequest() {
+        var response = handler.handleDomainException(
+                new com.benhsoan.domain.prescription.exception.PrescriptionNoChangesException(), request
+        );
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("PRESCRIPTION_NO_CHANGES", response.getBody().code());
+    }
+
+    @Test
+    void mapsTransactionSystemExceptionWrappingDataIntegrityViolationToConflict() {
+        TransactionSystemException ex = new TransactionSystemException(
+                "Could not commit JPA transaction",
+                new DataIntegrityViolationException("constraint violation")
+        );
+
+        var response = handler.handleTransactionSystemException(ex, request);
+
+        assertEquals(409, response.getStatusCode().value());
+        assertEquals("DATA_INTEGRITY_VIOLATION", response.getBody().code());
+    }
+
+    @Test
+    void mapsUnrelatedTransactionSystemExceptionToInternalServerError() {
+        TransactionSystemException ex = new TransactionSystemException(
+                "Could not commit JPA transaction",
+                new IllegalStateException("unrelated infrastructure failure")
+        );
+
+        var response = handler.handleTransactionSystemException(ex, request);
+
+        assertEquals(500, response.getStatusCode().value());
+        assertEquals("INTERNAL_SERVER_ERROR", response.getBody().code());
+    }
+
+    private ApiErrorResponse assertContract(
+            ResponseEntity<ApiErrorResponse> response,
+            int expectedStatus,
+            String expectedCode
+    ) {
+        ApiErrorResponse body = response.getBody();
+        assertAll(
+                () -> assertEquals(expectedStatus, response.getStatusCode().value()),
+                () -> assertNotNull(body),
+                () -> assertNotNull(body.timestamp()),
+                () -> assertEquals(expectedStatus, body.status()),
+                () -> assertNotNull(body.error()),
+                () -> assertEquals(expectedCode, body.code()),
+                () -> assertNotNull(body.message()),
+                () -> assertEquals(request.getRequestURI(), body.path()),
+                () -> assertNotNull(body.details())
+        );
+        return body;
+    }
+}

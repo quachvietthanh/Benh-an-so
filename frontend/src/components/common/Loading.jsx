@@ -1,30 +1,11 @@
 import React from 'react'
-import { Spin } from 'antd'
 
-function Loading({ tip = 'Đang tải...', fullPage = false }) {
-  if (fullPage) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-      }}>
-        <Spin size="large" tip={tip} />
-      </div>
-    )
-  }
-
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '40px 0',
-    }}>
-      <Spin size="large" tip={tip} />
-    </div>
-  )
+/**
+ * Lightweight Loading Component (No-op)
+ * Renders children or null without any blocking delays or overlays.
+ */
+function Loading({ children }) {
+  return children || null
 }
 
 export default Loading

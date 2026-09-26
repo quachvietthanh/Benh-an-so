@@ -1,0 +1,637 @@
+{
+  "info": {
+    "name": "Benh So An - Luồng Khám Bệnh Thực Tế (End-to-End Workflow)",
+    "_postman_id": "c2a10000-0000-0000-0000-000000000001",
+    "description": "Kịch bản kiểm thử API Postman tự động cho toàn bộ luồng khám bệnh thực tế:\n1. Đăng nhập phân quyền (Lễ tân, Bác sĩ, Dược sĩ)\n2. Đến khám (Walk-in check-in tại quầy)\n3. Hàng đợi (Xem danh sách chờ phòng khám)\n4. Bác sĩ gọi khám (Call next chuyển IN_PROGRESS)\n5. Tra cứu template, tạo bệnh án DRAFT & áp template chuyên khoa\n6. Nhập thông tin lâm sàng & chẩn đoán ICD-10\n7. Kê đơn thuốc ngoại trú\n8. Ký số bệnh án\n9. Khóa bệnh án (LOCKED - bảo vệ bất biến)\n10. Dược sĩ cấp phát thuốc trừ kho\n11. Bác sĩ hoàn thành lượt khám (COMPLETED trong hàng đợi)\n\nLưu ý: Bộ collection đã được cấu hình sẵn đầy đủ biến nội bộ (Collection Variables). Có thể chạy trực tiếp với 'Run Collection' ngay cả khi chọn 'No Environment'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1", "type": "string" },
+    { "key": "receptionistUsername", "value": "receptionist1", "type": "string" },
+    { "key": "doctorUsername", "value": "doctor1", "type": "string" },
+    { "key": "pharmacistUsername", "value": "pharmacist1", "type": "string" },
+    { "key": "seededPassword", "value": "password", "type": "string" },
+    { "key": "patientId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001", "type": "string" },
+    { "key": "doctorId", "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2", "type": "string" },
+    { "key": "specialtyId", "value": "f0000000-0000-0000-0000-000000000002", "type": "string" },
+    { "key": "diagnosisCatalogId", "value": "e3000000-0000-0000-0000-000000000001", "type": "string" },
+    { "key": "medicineId", "value": "16000000-0000-0000-0000-000000000001", "type": "string" },
+    { "key": "todayDate", "value": "", "type": "string" },
+    { "key": "receptionistToken", "value": "", "type": "string" },
+    { "key": "doctorToken", "value": "", "type": "string" },
+    { "key": "pharmacistToken", "value": "", "type": "string" },
+    { "key": "queueItemId", "value": "", "type": "string" },
+    { "key": "medicalQueueId", "value": "", "type": "string" },
+    { "key": "visitId", "value": "", "type": "string" },
+    { "key": "visitCode", "value": "", "type": "string" },
+    { "key": "templateId", "value": "", "type": "string" },
+    { "key": "templateVersionId", "value": "", "type": "string" },
+    { "key": "medicalRecordId", "value": "", "type": "string" },
+    { "key": "prescriptionId", "value": "", "type": "string" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Luôn tự động cập nhật ngày hôm nay cho toàn bộ requests trong collection",
+          "var today = new Date().toISOString().split('T')[0];",
+          "pm.collectionVariables.set('todayDate', today);",
+          "if (pm.environment) {",
+          "    pm.environment.set('todayDate', today);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Xác thực & Đăng nhập (Auth)",
+      "description": "Đăng nhập 3 tài khoản nghiệp vụ để lấy JWT Access Token và tự động lưu vào biến môi trường / biến collection.",
+      "item": [
+        {
+          "name": "0.1 Đăng nhập Lễ tân (Receptionist)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Lễ tân đăng nhập thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('receptionistToken', json.accessToken);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('receptionistToken', json.accessToken);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "0.2 Đăng nhập Bác sĩ (Doctor)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Bác sĩ đăng nhập thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('doctorToken', json.accessToken);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('doctorToken', json.accessToken);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{doctorUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "0.3 Đăng nhập Dược sĩ (Pharmacist)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Dược sĩ đăng nhập thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('pharmacistToken', json.accessToken);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('pharmacistToken', json.accessToken);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{pharmacistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Đến khám (Walk-in Check-in)",
+      "description": "Lễ tân tiếp đón bệnh nhân vãng lai hoặc tái khám, cấp số thứ tự vào hàng đợi phòng khám của bác sĩ.",
+      "item": [
+        {
+          "name": "1.1 Tiếp đón bệnh nhân (Walk-in)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Check-in thành công (HTTP 201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.queueItemId).to.be.a('string');",
+                  "    pm.expect(json.visitId).to.be.a('string');",
+                  "    pm.expect(json.medicalQueueId).to.be.a('string');",
+                  "    pm.expect(json.sourceType).to.eql('WALK_IN');",
+                  "    ",
+                  "    pm.collectionVariables.set('queueItemId', json.queueItemId);",
+                  "    pm.collectionVariables.set('visitId', json.visitId);",
+                  "    pm.collectionVariables.set('medicalQueueId', json.medicalQueueId);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('queueItemId', json.queueItemId);",
+                  "        pm.environment.set('visitId', json.visitId);",
+                  "        pm.environment.set('medicalQueueId', json.medicalQueueId);",
+                  "    }",
+                  "    if (json.visitCode) {",
+                  "        pm.collectionVariables.set('visitCode', json.visitCode);",
+                  "        if (pm.environment) {",
+                  "            pm.environment.set('visitCode', json.visitCode);",
+                  "        }",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{receptionistToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"reason\": \"Sốt cao 38.5 độ C, đau rát họng, ho khan 2 ngày\",\n  \"note\": \"Bệnh nhân đến trực tiếp quầy tiếp đón sáng nay\",\n  \"specialtyId\": \"{{specialtyId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/queue-items/walk-in"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Hàng đợi (Queue Management)",
+      "description": "Bác sĩ và lễ tân kiểm tra danh sách chờ tại phòng khám.",
+      "item": [
+        {
+          "name": "2.1 Bác sĩ xem hàng đợi phòng khám của mình",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Lấy danh sách hàng đợi thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(Array.isArray(json)).to.be.true;",
+                  "    var targetId = pm.variables.get('queueItemId');",
+                  "    var currentItem = json.find(item => item.id === targetId);",
+                  "    pm.expect(currentItem).to.not.be.undefined;",
+                  "    pm.expect(currentItem.status).to.eql('WAITING');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/queues/me?date={{todayDate}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["queues", "me"],
+              "query": [
+                { "key": "date", "value": "{{todayDate}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Gọi khám (Call Next)",
+      "description": "Bác sĩ kích hoạt gọi lượt khám tiếp theo trong hàng đợi. Lượt khám chuyển sang trạng thái IN_PROGRESS.",
+      "item": [
+        {
+          "name": "3.1 Bác sĩ gọi bệnh nhân vào khám",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Gọi khám thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.eql(pm.variables.get('queueItemId'));",
+                  "    pm.expect(json.status).to.eql('IN_PROGRESS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/queues/{{medicalQueueId}}/call-next"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Chọn Template & Ghi Bệnh Án (Medical Record)",
+      "description": "Bác sĩ chọn mẫu bệnh án theo chuyên khoa, khởi tạo bệnh án DRAFT, áp template, ghi kết quả lâm sàng và chẩn đoán ICD-10.",
+      "item": [
+        {
+          "name": "4.1 Lấy danh sách template gợi ý theo lượt khám",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Lấy template options thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.availableTemplates).to.be.an('array');",
+                  "    pm.expect(json.effectiveTemplate).to.not.be.null;",
+                  "    ",
+                  "    var chosenTemplate = json.effectiveTemplate || json.availableTemplates[0];",
+                  "    pm.collectionVariables.set('templateId', chosenTemplate.templateId);",
+                  "    pm.collectionVariables.set('templateVersionId', chosenTemplate.templateVersionId);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('templateId', chosenTemplate.templateId);",
+                  "        pm.environment.set('templateVersionId', chosenTemplate.templateVersionId);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/medical-records/visits/{{visitId}}/template-options"
+          }
+        },
+        {
+          "name": "4.2 Tạo hồ sơ bệnh án (DRAFT ban đầu)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tạo bệnh án DRAFT thành công (HTTP 201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.be.a('string');",
+                  "    pm.expect(json.status).to.eql('DRAFT');",
+                  "    pm.collectionVariables.set('medicalRecordId', json.id);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('medicalRecordId', json.id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visitId\": \"{{visitId}}\",\n  \"chiefComplaint\": null\n}"
+            },
+            "url": "{{baseUrl}}/medical-records"
+          }
+        },
+        {
+          "name": "4.3 Áp Template chuyên khoa vào bệnh án",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Áp template thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.appliedTemplate).to.not.be.null;",
+                  "    pm.expect(json.appliedTemplate.templateId).to.eql(pm.variables.get('templateId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateId\": \"{{templateId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/template"
+          }
+        },
+        {
+          "name": "4.4 Nhập thông tin khám lâm sàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cập nhật nội dung khám lâm sàng thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.chiefComplaint).to.eql('Sốt cao kèm ho khan 2 ngày');",
+                  "    pm.expect(json.conclusion).to.eql('Viêm hô hấp trên cấp tính / Theo dõi cảm cúm');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chiefComplaint\": \"Sốt cao kèm ho khan 2 ngày\",\n  \"symptoms\": \"Nhiệt độ 38.5 độ C, gai rét, đau rát họng khi nuốt, mệt mỏi\",\n  \"medicalHistory\": \"Không có tiền sử dị ứng thuốc, không bệnh nền mạn tính\",\n  \"physicalExamination\": \"Họng đỏ, niêm mạc xung huyết, tim đều rõ, phổi thông khí tốt không rale\",\n  \"clinicalProgress\": \"Bệnh khởi phát cấp tính 2 ngày trước\",\n  \"treatmentPlan\": \"Nghỉ ngơi, bù nước điện giải, dùng hạ sốt và thuốc giảm triệu chứng\",\n  \"doctorInstructions\": \"Uống nhiều nước ấm, tái khám ngay nếu sốt cao > 39 độ hoặc khó thở\",\n  \"conclusion\": \"Viêm hô hấp trên cấp tính / Theo dõi cảm cúm\"\n}"
+            },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+          }
+        },
+        {
+          "name": "4.5 Gắn mã chẩn đoán ICD-10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Gắn chẩn đoán ICD-10 thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(Array.isArray(json)).to.be.true;",
+                  "    pm.expect(json[0].diagnosisType).to.eql('PRIMARY');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"primaryDiagnosis\": {\n    \"diagnosisCatalogId\": \"{{diagnosisCatalogId}}\",\n    \"note\": \"Chẩn đoán chính xác nhận theo danh mục lâm sàng\"\n  },\n  \"secondaryDiagnoses\": []\n}"
+            },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/diagnoses"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Kê đơn thuốc (Prescription)",
+      "description": "Bác sĩ kê đơn thuốc cho bệnh nhân dựa trên hồ sơ bệnh án đã lập.",
+      "item": [
+        {
+          "name": "5.1 Bác sĩ kê đơn thuốc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Kê đơn thuốc thành công (HTTP 201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.be.a('string');",
+                  "    pm.expect(json.status).to.eql('PENDING_DISPENSE');",
+                  "    pm.expect(json.medicalRecordId).to.eql(pm.variables.get('medicalRecordId'));",
+                  "    pm.collectionVariables.set('prescriptionId', json.id);",
+                  "    if (pm.environment) {",
+                  "        pm.environment.set('prescriptionId', json.id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicalRecordId\": \"{{medicalRecordId}}\",\n  \"note\": \"Uống thuốc sau bữa ăn 15 phút, kiêng đồ uống lạnh\",\n  \"items\": [\n    {\n      \"medicineId\": \"{{medicineId}}\",\n      \"dosage\": \"500mg\",\n      \"frequency\": 2,\n      \"route\": \"ORAL\",\n      \"durationDays\": 5,\n      \"quantity\": 10,\n      \"instructions\": \"Uống mỗi lần 1 viên khi sốt > 38.5 độ C, cách nhau ít nhất 4-6 tiếng\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/prescriptions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Ký & Khóa Bệnh Án (Sign & Lock)",
+      "description": "Bác sĩ ký xác nhận chuyên môn và khóa hồ sơ bệnh án để đảm bảo tính bất biến theo quy định y tế.",
+      "item": [
+        {
+          "name": "6.1 Bác sĩ ký điện tử bệnh án",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Ký bệnh án thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('SIGNED');",
+                  "    pm.expect(json.signedBy).to.be.a('string');",
+                  "    pm.expect(json.signedAt).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signatureData\": \"Bác sĩ chuyên khoa xác nhận kết quả khám và phác đồ điều trị\"\n}"
+            },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/sign"
+          }
+        },
+        {
+          "name": "6.2 Khóa bệnh án (LOCKED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Khóa bệnh án thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('LOCKED');",
+                  "    pm.expect(json.lockedBy).to.be.a('string');",
+                  "    pm.expect(json.lockedAt).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/lock"
+          }
+        },
+        {
+          "name": "6.3 [Kiểm chứng] Chặn chỉnh sửa sau khi đã khóa bệnh án",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Từ chối sửa bệnh án đã khóa (HTTP 409 Conflict)', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chiefComplaint\": \"Cố tình thay đổi lý do khám sau khi đã khóa\"\n}"
+            },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Cấp phát thuốc (Pharmacy Dispense)",
+      "description": "Dược sĩ nhận đơn thuốc tại quầy dược, kiểm tra tồn kho và cấp phát thuốc cho bệnh nhân.",
+      "item": [
+        {
+          "name": "7.1 Dược sĩ cấp phát thuốc theo đơn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Cấp phát thuốc thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.prescription).to.not.be.null;",
+                  "    pm.expect(json.prescription.status).to.eql('DISPENSED');",
+                  "    pm.expect(json.dispensedBy).to.be.a('string');",
+                  "    pm.expect(Array.isArray(json.allocations)).to.be.true;",
+                  "    pm.expect(json.allocations[0].dispensedQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": "{{baseUrl}}/prescriptions/{{prescriptionId}}/dispense"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Hoàn thành lượt khám (Complete Encounter)",
+      "description": "Bác sĩ kết thúc phiên khám trong hàng đợi. Hệ thống kiểm tra điều kiện bệnh án đã LOCKED và cập nhật trạng thái COMPLETED.",
+      "item": [
+        {
+          "name": "8.1 Bác sĩ hoàn thành lượt khám",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Hoàn thành lượt khám thành công (HTTP 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.eql(pm.variables.get('queueItemId'));",
+                  "    pm.expect(json.status).to.eql('COMPLETED');",
+                  "    pm.expect(json.completedAt).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{doctorToken}}" }
+            ],
+            "url": "{{baseUrl}}/queue-items/{{queueItemId}}/complete"
+          }
+        }
+      ]
+    }
+  ]
+}

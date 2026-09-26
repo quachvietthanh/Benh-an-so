@@ -1,0 +1,302 @@
+package com.benhsoan.domain.visit;
+
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
+import com.benhsoan.domain.shared.Guard.Guard;
+import com.benhsoan.domain.shared.exception.ValidationException;
+import com.benhsoan.domain.specialty.Specialty;
+import com.benhsoan.domain.visit.enums.VisitStatus;
+import com.benhsoan.domain.visit.enums.VisitType;
+import com.benhsoan.domain.visit.exception.VisitAlreadyCancelledException;
+import com.benhsoan.domain.visit.exception.VisitAlreadyCompletedException;
+import com.benhsoan.domain.visit.exception.VisitInvalidStatusException;
+
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@EqualsAndHashCode(of = "id")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Visit {
+
+    private UUID id;
+    private String visitCode;
+    private UUID patientId;
+    private UUID doctorId;
+    private UUID initialDoctorId;
+    private UUID appointmentId;
+    private UUID queueItemId;
+    private UUID specialtyId;
+    private VisitType visitType;
+    private VisitStatus status;
+    private Instant visitAt;
+    private Instant startedAt;
+    private Instant completedAt;
+    private String reason;
+    private String note;
+    private String closeReason;
+    private Instant closedAt;
+    private UUID createdBy;
+    private Instant createdAt;
+    private Instant updatedAt;
+
+    private Visit(UUID id, String visitCode, UUID patientId, UUID doctorId, UUID initialDoctorId, UUID appointmentId, UUID queueItemId, UUID specialtyId,
+            VisitType visitType, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, String closeReason, Instant closedAt, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        this.id = Objects.requireNonNull(id);
+        this.visitCode = Guard.require(visitCode, "Visit code");
+        this.patientId = Objects.requireNonNull(patientId);
+        this.doctorId = Objects.requireNonNull(doctorId);
+        this.initialDoctorId = initialDoctorId;
+        this.appointmentId = appointmentId;
+        this.queueItemId = queueItemId;
+        this.specialtyId = Objects.requireNonNull(specialtyId);
+        this.visitType = Objects.requireNonNull(visitType);
+        this.status = Objects.requireNonNull(status);
+        this.visitAt = Objects.requireNonNull(visitAt);
+        this.startedAt = startedAt;
+        this.completedAt = completedAt;
+        this.reason = Guard.require(reason, "Reason");
+        this.note = note;
+        this.closeReason = closeReason;
+        this.closedAt = closedAt;
+        this.createdBy = Objects.requireNonNull(createdBy);
+        this.createdAt = Objects.requireNonNull(createdAt);
+        this.updatedAt = updatedAt;
+    }
+
+    public UUID getInitialDoctorId() {
+        return initialDoctorId != null ? initialDoctorId : doctorId;
+    }
+
+    public UUID getRawInitialDoctorId() {
+        return initialDoctorId;
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
+        return create(code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, visitAt, reason, note, createdBy);
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, null, appointmentId, queueItemId, specialtyId,
+                type, VisitStatus.WAITING, visitAt, null, null, reason, note, null, null, createdBy, Instant.now(), null);
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
+        return create(code, patientId, doctorId, appointmentId, queueItemId, Specialty.GENERAL_ID, type, visitAt,
+                reason, note, createdBy, createdAt);
+    }
+
+    public static Visit create(String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, Instant visitAt, String reason, String note, UUID createdBy, Instant createdAt) {
+        return new Visit(UUID.randomUUID(), code, patientId, doctorId, null, appointmentId, queueItemId, specialtyId, type,
+                VisitStatus.WAITING, visitAt, null, null, reason, note, null, null, createdBy,
+                Objects.requireNonNull(createdAt), null);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt, String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return restore(id, code, patientId, doctorId, null, appointmentId, queueItemId, Specialty.GENERAL_ID, type, status,
+                visitAt, startedAt, completedAt, reason, note, null, null, createdBy, createdAt, updatedAt);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return restore(id, code, patientId, doctorId, null, appointmentId, queueItemId, specialtyId, type, status, visitAt,
+                startedAt, completedAt, reason, note, null, null, createdBy, createdAt, updatedAt);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, String closeReason, Instant closedAt, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return new Visit(id, code, patientId, doctorId, null, appointmentId, queueItemId, specialtyId, type, status, visitAt,
+                startedAt, completedAt, reason, note, closeReason, closedAt, createdBy, createdAt, updatedAt);
+    }
+
+    public static Visit restore(UUID id, String code, UUID patientId, UUID doctorId, UUID initialDoctorId, UUID appointmentId, UUID queueItemId,
+            UUID specialtyId, VisitType type, VisitStatus status, Instant visitAt, Instant startedAt, Instant completedAt,
+            String reason, String note, String closeReason, Instant closedAt, UUID createdBy, Instant createdAt, Instant updatedAt) {
+        return new Visit(id, code, patientId, doctorId, initialDoctorId, appointmentId, queueItemId, specialtyId, type, status, visitAt,
+                startedAt, completedAt, reason, note, closeReason, closedAt, createdBy, createdAt, updatedAt);
+    }
+
+    public void handover(UUID targetDoctorId, String reason, Instant at) {
+        requireActiveForHandover();
+        UUID target = Objects.requireNonNull(targetDoctorId, "Target doctor id is required.");
+        if (this.doctorId.equals(target)) {
+            throw new ValidationException("Cannot handover to the same doctor.");
+        }
+        requireHandoverReason(reason);
+        if (this.initialDoctorId == null) {
+            this.initialDoctorId = this.doctorId;
+        }
+        this.doctorId = target;
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    private void requireActiveForHandover() {
+        if (status != VisitStatus.IN_PROGRESS && status != VisitStatus.WAITING_FOR_RESULT) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            if (status == VisitStatus.CANCELLED) throw new VisitAlreadyCancelledException();
+            throw new VisitInvalidStatusException("Only active visits in progress can be handed over.");
+        }
+    }
+
+    private static String requireHandoverReason(String reason) {
+        String validated = reason == null ? null : reason.trim();
+        if (validated == null || validated.isBlank()) {
+            throw new ValidationException("Handover reason is required.");
+        }
+        if (validated.length() > 500) {
+            throw new ValidationException("Handover reason must not exceed 500 characters.");
+        }
+        return validated;
+    }
+
+    public void start(Instant at) {
+        require(VisitStatus.WAITING);
+        startedAt = Objects.requireNonNull(at);
+        status = VisitStatus.IN_PROGRESS;
+        updatedAt = at;
+    }
+
+    public void waitForResult(Instant at) {
+        require(VisitStatus.IN_PROGRESS);
+        status = VisitStatus.WAITING_FOR_RESULT;
+        updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void resume(Instant at) {
+        require(VisitStatus.WAITING_FOR_RESULT);
+        status = VisitStatus.IN_PROGRESS;
+        updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void complete(Instant at) {
+        if (status != VisitStatus.IN_PROGRESS && status != VisitStatus.WAITING_FOR_RESULT) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            if (status == VisitStatus.CANCELLED) throw new VisitAlreadyCancelledException();
+            throw new VisitInvalidStatusException("Only active visits can be completed.");
+        
+        }if (startedAt == null || at.isBefore(startedAt)) {
+            throw new ValidationException("Completion time must not be before start time.");
+        
+        }status = VisitStatus.COMPLETED;
+        completedAt = at;
+        updatedAt = at;
+    }
+
+    public void cancel(Instant at) {
+        if (status == VisitStatus.COMPLETED || status == VisitStatus.CANCELLED) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            throw new VisitAlreadyCancelledException();
+        
+        }status = VisitStatus.CANCELLED;
+        updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void earlyEnd(String reason, Instant at) {
+        requireInProgressForClose();
+        String validatedReason = requireCloseReason(reason);
+        this.status = VisitStatus.EARLY_ENDED;
+        this.closeReason = validatedReason;
+        this.closedAt = Objects.requireNonNull(at);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void cancel(String reason, Instant at) {
+        requireInProgressForClose();
+        String validatedReason = requireCloseReason(reason);
+        this.status = VisitStatus.CANCELLED;
+        this.closeReason = validatedReason;
+        this.closedAt = Objects.requireNonNull(at);
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void revertToWaiting(Instant at) {
+        if (status != VisitStatus.IN_PROGRESS) {
+            throw new VisitInvalidStatusException("Only in-progress visits can be reverted to waiting.");
+        }
+        this.status = VisitStatus.WAITING;
+        this.startedAt = null;
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void updateRegistrationInformation(UUID doctorId, UUID appointmentId, UUID queueItemId, VisitType type, Instant visitAt, String reason, String note, Instant at) {
+        require(VisitStatus.WAITING);
+        this.doctorId = Objects.requireNonNull(doctorId);
+        this.appointmentId = appointmentId;
+        this.queueItemId = queueItemId;
+        this.visitType = Objects.requireNonNull(type);
+        this.visitAt = Objects.requireNonNull(visitAt);
+        this.reason = Guard.require(reason, "Reason");
+        this.note = note;
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public void assignQueueItem(UUID queueItemId, Instant assignedAt) {
+        require(VisitStatus.WAITING);
+        if (this.queueItemId != null) {
+            throw new VisitInvalidStatusException("Visit is already linked to a queue item.");
+        }
+        this.queueItemId = Guard.require(queueItemId, "Queue item id");
+        this.updatedAt = Guard.require(assignedAt, "Assigned at");
+    }
+
+    public void updateNote(String note, Instant at) {
+        if (status == VisitStatus.COMPLETED || status == VisitStatus.CANCELLED || status == VisitStatus.EARLY_ENDED) {
+            throw new VisitInvalidStatusException("Finished visits cannot be updated.");
+        
+        }this.note = note;
+        this.updatedAt = Objects.requireNonNull(at);
+    }
+
+    public boolean isActive() {
+        return status == VisitStatus.WAITING || status == VisitStatus.IN_PROGRESS || status == VisitStatus.WAITING_FOR_RESULT;
+    }
+
+    public boolean isCompleted() {
+        return status == VisitStatus.COMPLETED;
+    }
+
+    public boolean isCancelled() {
+        return status == VisitStatus.CANCELLED;
+    }
+
+    public boolean isEarlyEnded() {
+        return status == VisitStatus.EARLY_ENDED;
+    }
+
+    private void requireInProgressForClose() {
+        if (status != VisitStatus.IN_PROGRESS) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            if (status == VisitStatus.CANCELLED) throw new VisitAlreadyCancelledException();
+            throw new VisitInvalidStatusException("Only in-progress visits can be closed.");
+        }
+    }
+
+    private String requireCloseReason(String reason) {
+        String validated = reason == null ? null : reason.trim();
+        if (validated == null || validated.isBlank()) {
+            throw new ValidationException("Close reason is required.");
+        }
+        if (validated.length() > 500) {
+            throw new ValidationException("Close reason must not exceed 500 characters.");
+        }
+        return validated;
+    }
+
+    private void require(VisitStatus expected) {
+        if (status != expected) {
+            if (status == VisitStatus.COMPLETED) throw new VisitAlreadyCompletedException();
+            if (status == VisitStatus.CANCELLED) throw new VisitAlreadyCancelledException();
+            throw new VisitInvalidStatusException("Invalid visit status transition.");
+    
+        }}
+}

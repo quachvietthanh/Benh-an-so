@@ -1,0 +1,89 @@
+package com.benhsoan.adapter.inbound.rest.mapper;
+
+import java.util.List;
+
+import com.benhsoan.application.ucservice.anonymization.AnonymizationModeState;
+import org.springframework.stereotype.Component;
+
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse.PatientInfo;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDetailResponse.VisitInfo;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordDiagnosisResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.AppliedMedicalRecordTemplateResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.MedicalRecordTemplateSectionResponse;
+import com.benhsoan.adapter.inbound.rest.response.medicalrecord.SpecialtyResponse;
+import com.benhsoan.domain.patient.PatientAnonymizer;
+import com.benhsoan.port.dto.result.AppliedMedicalRecordTemplateResult;
+import com.benhsoan.port.dto.result.MedicalRecordDetailResult;
+import com.benhsoan.port.dto.result.MedicalRecordDiagnosisResult;
+
+@Component
+public class MedicalRecordDetailRestMapper {
+
+    private final AnonymizationModeState anonymizationModeState;
+
+    public MedicalRecordDetailRestMapper(
+            AnonymizationModeState anonymizationModeState) {
+        this.anonymizationModeState = anonymizationModeState;
+    }
+
+    public MedicalRecordDetailResponse toResponse(MedicalRecordDetailResult result) {
+        String emergencyContact = anonymizationModeState.isEnabled() && result.patient().emergencyContact() != null
+                ? PatientAnonymizer.maskFullName(null)
+                : result.patient().emergencyContact();
+        String emergencyPhone = anonymizationModeState.isEnabled()
+                ? PatientAnonymizer.maskPhone(result.patient().emergencyPhone())
+                : result.patient().emergencyPhone();
+
+        PatientInfo patient = new PatientInfo(
+                result.patient().id(), result.patient().patientCode(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskFullName(result.patient().patientCode()) : result.patient().fullName(),
+                result.patient().dateOfBirth(), result.patient().gender(),
+                anonymizationModeState.isEnabled() ? PatientAnonymizer.maskPhone(result.patient().phone()) : result.patient().phone(),
+                result.patient().identityNumber(), result.patient().insuranceNumber(),
+                emergencyContact, result.patient().emergencyRelationship(), emergencyPhone);
+
+        VisitInfo visit = new VisitInfo(
+                result.visit().id(), result.visit().visitCode(), result.visit().visitType(),
+                result.visit().status(), result.visit().visitAt(), result.visit().startedAt(),
+                result.visit().completedAt(), result.visit().reason(), result.visit().note(),
+                result.visit().doctorId(), result.visit().doctorName());
+
+        List<MedicalRecordDiagnosisResponse> diagnoses = result.diagnoses().stream()
+                .map(this::toDiagnosisResponse)
+                .toList();
+
+        return new MedicalRecordDetailResponse(
+                patient, visit,
+                result.medicalRecordId(), result.chiefComplaint(), result.symptoms(),
+                result.medicalHistory(), result.physicalExamination(), result.clinicalProgress(),
+                result.treatmentPlan(), result.doctorInstructions(), result.conclusion(),
+                result.revisitDate(),
+                result.status(), result.signatureData(), result.signedAt(), result.signedBy(),
+                result.lockedAt(), result.lockedBy(),
+                result.primaryIcdCode(), result.primaryIcdName(), result.secondaryIcdCodes(),
+                diagnoses,
+                toAppliedTemplateResponse(result.appliedTemplate())
+        );
+    }
+
+    public List<MedicalRecordDetailResponse> toResponses(List<MedicalRecordDetailResult> results) {
+        return results.stream().map(this::toResponse).toList();
+    }
+
+    private MedicalRecordDiagnosisResponse toDiagnosisResponse(MedicalRecordDiagnosisResult d) {
+        return new MedicalRecordDiagnosisResponse(
+                d.id(), d.medicalRecordId(), d.diagnosisCatalogId(), d.diagnosisCode(), d.diagnosisName(),
+                d.diagnosisType(), d.note(), d.diagnosedBy(), d.diagnosedAt());
+    }
+
+    private AppliedMedicalRecordTemplateResponse toAppliedTemplateResponse(AppliedMedicalRecordTemplateResult result) {
+        if (result == null) return null;
+        SpecialtyResponse specialty = new SpecialtyResponse(result.specialty().id(), result.specialty().code(),
+                result.specialty().name(), result.specialty().active());
+        var sections = result.sections().stream().map(section -> new MedicalRecordTemplateSectionResponse(
+                section.fieldCode(), section.label(), section.required(), section.displayOrder())).toList();
+        return new AppliedMedicalRecordTemplateResponse(result.templateId(), result.templateVersionId(), specialty,
+                result.name(), result.versionNo(), sections, result.appliedBy(), result.appliedAt(), result.fallback());
+    }
+}

@@ -1,0 +1,513 @@
+package com.benhsoan.domain.appointment;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
+import java.util.UUID;
+
+import com.benhsoan.domain.appointment.enums.AppointmentStatus;
+import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCancelledException;
+import com.benhsoan.domain.appointment.exception.AppointmentAlreadyCompletedException;
+import com.benhsoan.domain.appointment.exception.AppointmentInvalidStatusException;
+import com.benhsoan.domain.appointment.exception.AppointmentNotOverdueException;
+import com.benhsoan.domain.appointment.exception.AppointmentPastCutoffException;
+import com.benhsoan.domain.appointment.exception.AppointmentTimeInPastException;
+import com.benhsoan.domain.shared.Guard.Guard;
+import com.benhsoan.domain.shared.exception.ValidationException;
+
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
+@Getter
+@ToString
+@EqualsAndHashCode(of = "id")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Appointment {
+
+    private UUID id;
+
+    private String appointmentCode;
+
+    private UUID patientId;
+
+    private UUID doctorId;
+
+    private Instant startTime;
+
+    private Instant endTime;
+
+    private AppointmentStatus status;
+
+    private String reason;
+
+    private String cancelReason;
+
+    private Instant checkedInAt;
+
+    private Instant completedAt;
+
+    private UUID createdBy;
+
+    private Instant createdAt;
+
+    private String bookingChannel;
+
+    private Instant confirmedAt;
+
+    private UUID confirmedBy;
+
+    private UUID seriesId;
+
+    private Integer sequenceNumber;
+
+    private static final Duration NO_SHOW_THRESHOLD = Duration.ofMinutes(15);
+    
+    private Appointment(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime, 
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            UUID seriesId,
+            Integer sequenceNumber
+    ) {
+
+        this.id = Objects.requireNonNull(id);
+        this.appointmentCode = Guard.require(appointmentCode, "Appointment code");
+        this.patientId = Objects.requireNonNull(patientId);
+        this.doctorId = Objects.requireNonNull(doctorId);
+        this.startTime = Guard.require(startTime, "Start time");
+        this.endTime = Guard.require(endTime, "End time");
+        this.status = Guard.require(status, "Status");
+        this.reason = Guard.require(reason, "Reason");
+        this.cancelReason = cancelReason;
+        this.checkedInAt = checkedInAt;
+        this.completedAt = completedAt;
+        this.createdBy = Objects.requireNonNull(createdBy);
+        this.createdAt = Objects.requireNonNull(createdAt);
+        this.bookingChannel = bookingChannel;
+        this.confirmedAt = confirmedAt;
+        this.confirmedBy = confirmedBy;
+        this.seriesId = seriesId;
+        this.sequenceNumber = sequenceNumber;
+    }
+
+    public static Appointment create(
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            UUID createdBy
+    ) {
+        return create(appointmentCode, patientId, doctorId, startTime, endTime, reason, createdBy, null);
+    }
+
+    public static Appointment create(
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            UUID createdBy,
+            String bookingChannel
+    ) {
+         if (!endTime.isAfter(startTime)) 
+            throw new ValidationException("End time must be after start time.");
+        if (startTime.isBefore(Instant.now()))
+            throw new AppointmentTimeInPastException();
+
+        return new Appointment(
+                UUID.randomUUID(),
+                appointmentCode,
+                patientId,
+                doctorId,
+                startTime,
+                endTime,
+                AppointmentStatus.SCHEDULED,
+                reason,
+                null,
+                null,
+                null,
+                createdBy,
+                Instant.now(),
+                bookingChannel,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    public static Appointment createSeriesAppointment(
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            UUID createdBy,
+            String bookingChannel,
+            UUID seriesId,
+            Integer sequenceNumber,
+            Instant now
+    ) {
+        if (!endTime.isAfter(startTime)) 
+            throw new ValidationException("End time must be after start time.");
+        if (startTime.isBefore(now))
+            throw new AppointmentTimeInPastException();
+
+        return new Appointment(
+                UUID.randomUUID(),
+                appointmentCode,
+                patientId,
+                doctorId,
+                startTime,
+                endTime,
+                AppointmentStatus.SCHEDULED,
+                reason,
+                null,
+                null,
+                null,
+                createdBy,
+                now,
+                bookingChannel,
+                null,
+                null,
+                seriesId,
+                sequenceNumber
+        );
+    }
+
+    public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt
+    ) {
+        return restore(id, appointmentCode, patientId, doctorId, startTime, endTime,
+                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, null, null, null);
+    }
+
+    public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel
+    ) {
+        return restore(id, appointmentCode, patientId, doctorId, startTime, endTime,
+                status, reason, cancelReason, checkedInAt, completedAt, createdBy, createdAt, bookingChannel, null, null);
+    }
+
+    public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel,
+            Instant confirmedAt,
+            UUID confirmedBy
+    ) {
+        return restore(
+                id,
+                appointmentCode,
+                patientId,
+                doctorId,
+                startTime,
+                endTime,
+                status,
+                reason,
+                cancelReason,
+                checkedInAt,
+                completedAt,
+                createdBy,
+                createdAt,
+                bookingChannel,
+                confirmedAt,
+                confirmedBy,
+                null,
+                null
+        );
+    }
+
+    public static Appointment restore(
+            UUID id,
+            String appointmentCode,
+            UUID patientId,
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            AppointmentStatus status,
+            String reason,
+            String cancelReason,
+            Instant checkedInAt,
+            Instant completedAt,
+            UUID createdBy,
+            Instant createdAt,
+            String bookingChannel,
+            Instant confirmedAt,
+            UUID confirmedBy,
+            UUID seriesId,
+            Integer sequenceNumber
+    ) {
+        return new Appointment(
+                id,
+                appointmentCode,
+                patientId,
+                doctorId,
+                startTime,
+                endTime,
+                status,
+                reason,
+                cancelReason,
+                checkedInAt,
+                completedAt,
+                createdBy,
+                createdAt,
+                bookingChannel,
+                confirmedAt,
+                confirmedBy,
+                seriesId,
+                sequenceNumber
+        );
+    }
+
+    public void reschedule(
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            Instant now
+    ) {
+        if (!endTime.isAfter(startTime)) {
+            throw new ValidationException("End time must be after start time.");
+        }
+        if (startTime.isBefore(now)) {
+            throw new AppointmentTimeInPastException();
+        }
+
+        if (status == AppointmentStatus.CANCELLED) {
+            throw new AppointmentAlreadyCancelledException();
+        }
+
+        if (status == AppointmentStatus.COMPLETED) {
+            throw new AppointmentAlreadyCompletedException();
+        }
+
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentInvalidStatusException(
+                    "Chỉ có thể đổi lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
+            );
+        }
+
+        if (!this.startTime.isAfter(now)) {
+            throw new AppointmentPastCutoffException(
+                    "Lịch hẹn đã quá giờ khám, vui lòng tạo lịch hẹn mới."
+            );
+        }
+
+        if (endTime.isBefore(now)) {
+            throw new AppointmentTimeInPastException();
+        }
+
+        this.doctorId = Objects.requireNonNull(doctorId);
+        this.startTime = Guard.require(startTime, "Start time");
+        this.endTime = Guard.require(endTime, "End time");
+    }
+
+    public void reschedule(
+            UUID doctorId,
+            Instant startTime,
+            Instant endTime,
+            String reason,
+            Instant now
+    ) {
+        reschedule(doctorId, startTime, endTime, now);
+    }
+
+    public void confirm(UUID confirmedBy, Instant now) {
+        Guard.require(now, "Current time");
+
+        if (!this.startTime.isAfter(now)) {
+            throw new AppointmentPastCutoffException("Lịch hẹn đã quá giờ khám, không thể xác nhận.");
+        }
+
+        if (this.status != AppointmentStatus.SCHEDULED) {
+            throw new AppointmentInvalidStatusException("Chỉ có thể xác nhận lịch hẹn ở trạng thái SCHEDULED.");
+        }
+
+        this.confirmedBy = Objects.requireNonNull(confirmedBy, "Confirmed by user is required.");
+        this.confirmedAt = now;
+        this.status = AppointmentStatus.CONFIRMED;
+    }
+
+    public void checkIn(Instant checkedInAt) {
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentInvalidStatusException(
+                    "Chỉ có thể check-in lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
+            );
+        }
+
+        this.checkedInAt = Guard.require(checkedInAt, "Checked in time");
+        this.status = AppointmentStatus.CHECKED_IN;
+    }
+
+    public void start() {
+        if (status != AppointmentStatus.CHECKED_IN) {
+            throw new AppointmentInvalidStatusException(
+                    "Only checked in appointments can be started."
+            );
+        }
+
+        this.status = AppointmentStatus.IN_PROGRESS;
+    }
+
+    public void revertToCheckedIn() {
+        if (status != AppointmentStatus.IN_PROGRESS) {
+            throw new AppointmentInvalidStatusException(
+                    "Only in-progress appointments can be reverted to checked in."
+            );
+        }
+
+        this.status = AppointmentStatus.CHECKED_IN;
+    }
+
+    public void complete(Instant completedAt) {
+        if (status != AppointmentStatus.IN_PROGRESS) {
+            throw new AppointmentInvalidStatusException(
+                    "Only appointments in progress can be completed."
+            );
+        }
+
+        this.completedAt = Guard.require(completedAt, "Completed time");
+        this.status = AppointmentStatus.COMPLETED;
+    }
+
+    public void cancel(String cancelReason) {
+        if (status == AppointmentStatus.CANCELLED) {
+            throw new AppointmentAlreadyCancelledException();
+        }
+
+        if (status == AppointmentStatus.COMPLETED) {
+            throw new AppointmentAlreadyCompletedException();
+        }
+
+        if (status == AppointmentStatus.NO_SHOW) {
+            throw new AppointmentInvalidStatusException(
+                    "No-show appointments cannot be cancelled."
+            );
+        }
+        
+        this.cancelReason = Guard.require(cancelReason, "Cancel reason");
+        this.status = AppointmentStatus.CANCELLED;
+    }
+
+    public void markNoShow(Instant now) {
+
+        Guard.require(now, "Current time");
+
+        if (status != AppointmentStatus.SCHEDULED && status != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentInvalidStatusException(
+                    "Chỉ có thể đánh dấu không đến cho lịch hẹn ở trạng thái SCHEDULED hoặc CONFIRMED."
+            );
+        }
+
+        if (now.isBefore(getNoShowThresholdTime())) {
+            throw new AppointmentNotOverdueException();
+        }
+
+        this.status = AppointmentStatus.NO_SHOW;
+    }
+
+    public boolean canReschedule() {
+        return !isFinished();
+    }
+
+    public boolean canCheckIn() {
+        return status == AppointmentStatus.SCHEDULED || status == AppointmentStatus.CONFIRMED;
+    }
+
+    public boolean canStart() {
+        return status == AppointmentStatus.CHECKED_IN;
+    }
+
+    public boolean canComplete() {
+        return status == AppointmentStatus.IN_PROGRESS;
+    }
+
+    public boolean canCancel() {
+        return !isFinished();
+    }
+
+    public boolean canMarkNoShow(Instant now) {
+        Guard.require(now, "Current time");
+        return (status == AppointmentStatus.SCHEDULED || status == AppointmentStatus.CONFIRMED)
+                && !now.isBefore(getNoShowThresholdTime());
+    }
+
+    public boolean canConfirm(Instant now) {
+        Guard.require(now, "Current time");
+        return status == AppointmentStatus.SCHEDULED && this.startTime.isAfter(now);
+    }
+
+    public boolean isConfirmed() {
+        return status == AppointmentStatus.CONFIRMED;
+    }
+
+    public boolean isScheduled() {
+        return status == AppointmentStatus.SCHEDULED;
+    }
+
+    public boolean isFinished() {
+        return status == AppointmentStatus.COMPLETED
+            || status == AppointmentStatus.CANCELLED
+            || status == AppointmentStatus.NO_SHOW;
+    }
+
+    private Instant getNoShowThresholdTime() {
+        return startTime.plus(NO_SHOW_THRESHOLD);
+    }
+}

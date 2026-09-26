@@ -2,12 +2,12 @@
 
 > **Hệ thống chuyển đổi số cơ sở khám chữa bệnh** - Quản lý hồ sơ bệnh án điện tử toàn diện
 
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.3.x-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.x-brightgreen)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![React](https://img.shields.io/badge/React-18-61DAFB)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF)](https://vitejs.dev/)
 [![Ant Design](https://img.shields.io/badge/Ant_Design-5-1677FF)](https://ant.design/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8-4479A1)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
@@ -46,7 +46,7 @@
 
 ### 🔐 Authentication & Authorization
 - Đăng nhập với JWT Token
-- Phân quyền người dùng: `ADMIN`, `DOCTOR`, `NURSE`, `STAFF`
+- Phân quyền người dùng: `ADMIN`, `DOCTOR`, `RECEPTIONIST`, `PHARMACIST`, `MANAGER`
 - Bảo vệ API với Spring Security + JWT Filter
 
 ### 👤 Quản lý bệnh nhân
@@ -77,17 +77,16 @@
 | Công nghệ | Mô tả |
 |-----------|-------|
 | **Java 21** | OpenJDK Temurin |
-| **Spring Boot 3.3.x** | Framework chính |
+| **Spring Boot 3.5.x** | Framework chính |
 | **Spring Security** | Xác thực & phân quyền |
 | **Spring Data JPA** | ORM - Truy vấn dữ liệu |
 | **Spring Validation** | Validation dữ liệu đầu vào |
 | **Spring Mail** | Gửi email |
 | **JWT (jjwt 0.12.6)** | Xác thực token |
 | **Lombok** | Giảm boilerplate code |
-| **MapStruct 1.6.2** | Mapping DTO <-> Entity |
 | **SpringDoc OpenAPI 2.5.0** | Tài liệu API Swagger |
 | **Flyway** | Migration database |
-| **PostgreSQL** | Database production |
+| **MySQL** | Database production |
 | **H2 Database** | Database development (in-memory) |
 
 ### Frontend
@@ -119,13 +118,16 @@
 │                      Backend (Spring Boot)                        │
 │  Port: 8080 | Context-path: /api/v1                               │
 │  Java 21 + Maven 3.9+                                             │
-│  Modules: Config, Controller, Service, Repository, Security       │
+│  Modules: adapter (inbound/rest), application (ucservice),         │
+│           port (inbound/outbound), domain, persistence,             │
+│           infrastructure (security, mail, storage)                  │
 └──────────────────────────┬───────────────────────────────────────┘
                            │ JPA / Hibernate
 ┌──────────────────────────┴───────────────────────────────────────┐
 │                         Database                                  │
-│  Dev:  H2 (In-memory)    - jdbc:h2:mem:benhsoandb                │
-│  Prod: PostgreSQL 16     - jdbc:postgresql://localhost:5432/...   │
+│  Local: MySQL 8  - jdbc:mysql://localhost:3306/digital_medical_record  │
+│  Dev:   TiDB Cloud (MySQL-compatible) - gateway01.ap-southeast-1...   │
+│  Prod:  MySQL 8  - jdbc:mysql://... (từ env DB_URL/DB_USERNAME/DB_PASSWORD) │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -133,108 +135,86 @@
 
 ## 📁 Cấu trúc dự án
 
-```
-Bệnh số án/
-├── backend/                              # Spring Boot Backend
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/com/benhsoan/
-│   │   │   │   ├── config/               # Cấu hình (CORS, Security, Swagger)
-│   │   │   │   │   ├── SecurityConfig.java
-│   │   │   │   │   ├── WebConfig.java
-│   │   │   │   │   └── SwaggerConfig.java
-│   │   │   │   ├── controller/           # REST Controllers
-│   │   │   │   │   ├── AuthController.java
-│   │   │   │   │   ├── PatientController.java
-│   │   │   │   │   └── MedicalRecordController.java
-│   │   │   │   ├── dto/                  # Data Transfer Objects
-│   │   │   │   │   ├── LoginRequest.java
-│   │   │   │   │   ├── LoginResponse.java
-│   │   │   │   │   ├── PatientDTO.java
-│   │   │   │   │   └── MedicalRecordDTO.java
-│   │   │   │   ├── exception/            # Exception handling
-│   │   │   │   │   ├── ErrorResponse.java
-│   │   │   │   │   ├── BadRequestException.java
-│   │   │   │   │   ├── ResourceNotFoundException.java
-│   │   │   │   │   └── GlobalExceptionHandler.java
-│   │   │   │   ├── model/entity/         # JPA Entities
-│   │   │   │   │   ├── User.java
-│   │   │   │   │   ├── Patient.java
-│   │   │   │   │   └── MedicalRecord.java
-│   │   │   │   ├── repository/           # Data repositories
-│   │   │   │   │   ├── UserRepository.java
-│   │   │   │   │   ├── PatientRepository.java
-│   │   │   │   │   └── MedicalRecordRepository.java
-│   │   │   │   ├── security/             # JWT, Authentication
-│   │   │   │   │   ├── JwtTokenProvider.java
-│   │   │   │   │   ├── JwtAuthenticationFilter.java
-│   │   │   │   │   └── CustomUserDetailsService.java
-│   │   │   │   └── service/              # Business logic
-│   │   │   │       ├── AuthService.java
-│   │   │   │       ├── PatientService.java
-│   │   │   │       └── MedicalRecordService.java
-│   │   │   └── resources/                # Config files
-│   │   │       ├── application.properties
-│   │   │       ├── application-dev.properties
-│   │   │       ├── application-prod.properties
-│   │   │       └── db/migration/         # Flyway migrations
-│   │   └── test/                         # Unit tests
+# Bệnh Án Số - Project Structure
+
+```text
+Bệnh án số/
+│
+├── backend/
 │   ├── pom.xml
-│   └── .gitignore
+│   └── src/
+│       ├── main/java/com/benhsoan/
+│       │   ├── BenhSoAnApplication.java
+│       │   ├── config/                      (SecurityConfig, AppointmentReminderProperties)
+│       │   ├── adapter/
+│       │   │   └── inbound/rest/
+│       │   │       ├── controller/          (Auth, Patient, User, MedicalRecord, MedicalHistory,
+│       │   │       │                         Appointment, MedicalQueue, LegacyAppointmentQueue,
+│       │   │       │                         DiagnosisCatalog, ExaminationDiagnosis,
+│       │   │       │                         ClinicalOrder, ClinicalServiceCatalog, Home)
+│       │   │       ├── request/             (request DTO theo từng domain)
+│       │   │       ├── response/            (response DTO theo từng domain)
+│       │   │       └── mapper/              (rest mapper: request/command, result/response)
+│       │   ├── application/ucservice/       (auth, patient, user, medicalrecord, clinical,
+│       │   │   │                             appointment, queue, queries)
+│       │   │   └── ...                      (Service triển khai Inbound Port)
+│       │   ├── port/
+│       │   │   ├── inbound/                 (UseCase Ports theo domain)
+│       │   │   ├── outbound/                (repository/, authSecurity/, security/, time/, ...)
+│       │   │   └── dto/                     (command/, query/, result/, PageResponse)
+│       │   ├── domain/                      (auth, patient, visit, medicalrecord, clinical,
+│       │   │   │                             queue, appointment, auditlog, shared/)
+│       │   ├── persistence/
+│       │   │   ├── entity/                  (JPA entities)
+│       │   │   ├── jpaRepository/           (Spring Data repositories)
+│       │   │   ├── adapterRepository/       (triển khai Outbound Port)
+│       │   │   └── mapper/                  (entity ↔ domain)
+│       │   ├── infrastructure/              (authSecurity/, security/, time/, notification/,
+│       │   │   │                             scheduler/, persistence/)
+│       │   ├── dto/  exception/             (GlobalExceptionHandler, ApiErrorResponse)
+│       │   └── common/
+│       └── main/resources/
+│           ├── application.properties       (mặc định: profile local — MySQL 8 + Flyway)
+│           ├── application-local.properties
+│           ├── application-dev.properties
+│           ├── application-prod.properties
+│           └── db/migration/                (Flyway V1 → V14)
+│       └── src/test/java/                   (domain, service, MockMvc, adapter, JPA tests)
 │
-├── frontend/                             # React Frontend
-│   ├── src/
-│   │   ├── api/                          # API calls
-│   │   │   ├── axiosClient.js
-│   │   │   ├── authApi.js
-│   │   │   ├── patientApi.js
-│   │   │   └── medicalRecordApi.js
-│   │   ├── components/
-│   │   │   ├── common/                   # Shared components
-│   │   │   │   ├── Header.jsx
-│   │   │   │   ├── Sidebar.jsx
-│   │   │   │   ├── Loading.jsx
-│   │   │   │   └── Pagination.jsx
-│   │   │   └── layout/                   # Layout components
-│   │   │       └── MainLayout.jsx
-│   │   ├── context/                      # React contexts
-│   │   │   └── AuthContext.jsx
-│   │   ├── hooks/                        # Custom hooks
-│   │   │   ├── useAuth.js
-│   │   │   └── usePagination.js
-│   │   ├── pages/                        # Page components
-│   │   │   ├── Login.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── PatientList.jsx
-│   │   │   ├── PatientDetail.jsx
-│   │   │   ├── MedicalRecordList.jsx
-│   │   │   └── NotFound.jsx
-│   │   ├── routes/                       # Route config
-│   │   │   └── AppRoutes.jsx
-│   │   ├── utils/                        # Utilities
-│   │   │   ├── constants.js
-│   │   │   └── helpers.js
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   ├── index.css
-│   │   └── main.jsx
-│   ├── .env.development
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   └── .gitignore
+├── frontend/
+│   ├── package.json                         (React 18 + Vite 5 + Ant Design 5)
+│   └── src/
+│       ├── api/                             (axiosClient + module API)
+│       ├── components/                      (layout/, clinical/, results/, attachments/, common/)
+│       ├── context/  hooks/  routes/        (AuthContext, useAuth, AppRoutes)
+│       ├── pages/                           (Login, Dashboard, PatientList/Detail, MedicalEncounter,
+│       │                                     AppointmentQueue, ClinicalOrders, Result, Pharmacy,
+│       │                                     Billing, Reports, Users, PublicLookup, ...)
+│       ├── utils/  styles/  mock-data/
+│       ├── App.jsx
+│       └── main.jsx
 │
-├── database/                             # Database scripts
-│   └── init.sql                          # Schema init script
+├── docs/
+│   ├── api/                                 (diagnosis-and-orders-delivery, medical-queue-delivery,
+│   │                                         medical-record-retrieval)
+│   ├── project-overview.md
+│   ├── permission-matrix.md
+│   ├── frontend-status-report.md
+│   └── ...
 │
-├── docs/                                 # Documentation
-│   └── project-overview.md
-│
+├── database/                                (init.sql, dbschemas.md)
 ├── README.md
 └── .gitignore
 ```
 
----
+## Kiến trúc áp dụng
+
+- **Domain-Driven Design (DDD)**
+- **Hexagonal Architecture (Ports & Adapters)**
+- **Clean Architecture**
+- **CQRS (Command Query Responsibility Segregation)**
+- **REST API**
+- **Event-Driven Architecture (Application Events)**
 
 ## 🚀 Hướng dẫn cài đặt
 
@@ -246,7 +226,8 @@ Bệnh số án/
 | **Maven** | 3.9+ |
 | **Node.js** | 18+ |
 | **npm** | 9+ |
-| **PostgreSQL** | 16 (cho production) |
+| **MySQL** | 8 (cho production) |
+REPLACE
 
 ### Backend
 
@@ -254,16 +235,24 @@ Bệnh số án/
 # 1. Di chuyển vào thư mục backend
 cd backend
 
-# 2. Build project (bỏ qua test)
+# 2. Compile project
+mvn clean compile
+
+# 3. Chạy kiểm thử
+mvn test
+
+# 4. Build (bỏ qua test)
 mvn clean install -DskipTests
 
-# 3. Chạy ứng dụng (mặc định profile dev)
+# 5. Chạy ứng dụng (mặc định profile local → MySQL 8 localhost)
 mvn spring-boot:run
 ```
 
-> **Lưu ý:** Mặc định chạy với profile `dev` (H2 in-memory). Để chạy với PostgreSQL, set biến môi trường:
+> **Lưu ý:** Mặc định chạy với profile `local` (**MySQL 8 localhost:3306** + Flyway V1–V14). Test tự động (`mvn test`) dùng H2 in-memory. Để chạy với MySQL production:
 > ```bash
-> set SPRING_PROFILES_ACTIVE=prod
+> set SPRING_PROFILES_ACTIVE=local
+> set DB_URL=jdbc:mysql://localhost:3306/digital_medical_record
+> set DB_USERNAME=root
 > set DB_PASSWORD=your_password
 > mvn spring-boot:run
 > ```
@@ -272,8 +261,8 @@ mvn spring-boot:run
 
 Sau khi chạy backend, truy cập:
 
-- **Swagger UI:** http://localhost:8080/api/v1/swagger-ui/index.html
-- **OpenAPI JSON:** http://localhost:8080/api/v1/v3/api-docs
+- **Swagger UI:** http://localhost:8080/api/v1/swagger-ui.html
+- **OpenAPI JSON:** http://localhost:8080/api/v1/api-docs
 - **H2 Console:** http://localhost:8080/api/v1/h2-console (JDBC URL: `jdbc:h2:mem:benhsoandb`)
 
 ### Frontend
@@ -299,22 +288,8 @@ npm run dev
 - H2 in-memory tự động khởi tạo khi chạy backend
 - H2 Console: http://localhost:8080/api/v1/h2-console
 
-#### Production (PostgreSQL)
+#### Production (MySQL)
 
-```bash
-# 1. Tạo database
-psql -U postgres
-CREATE DATABASE benhsoan_db;
-
-# 2. Chạy script init
-psql -U postgres -d benhsoan_db -f database/init.sql
-
-# 3. Cấu hình biến môi trường
-set SPRING_PROFILES_ACTIVE=prod
-set DB_PASSWORD=your_secure_password
-```
-
----
 
 ## 📡 API Endpoints
 
@@ -332,7 +307,7 @@ set DB_PASSWORD=your_secure_password
 ```json
 {
   "username": "admin",
-  "password": "password"
+  "password": "adnin123"
 }
 ```
 
@@ -375,16 +350,58 @@ set DB_PASSWORD=your_secure_password
 | `PUT` | `/medical-records/{id}` | Cập nhật hồ sơ | ✅ |
 | `DELETE` | `/medical-records/{id}` | Xóa hồ sơ | ✅ |
 
+### 🩺 Diagnosis Catalog & Medical-record Diagnoses (NCL-13-CN-002)
+
+| Method | Endpoint | Mô tả | Xác thực | Vai trò |
+|--------|----------|-------|----------|---------|
+| `GET` | `/diagnosis-catalog?search={query}` | Tra cứu danh mục mã bệnh | ✅ | ADMIN, DOCTOR |
+| `PUT` | `/medical-records/{medicalRecordId}/diagnoses` | Thay thế chẩn đoán chính/phụ của bệnh án | ✅ | DOCTOR (ADMIN bị loại trừ) |
+| `GET` | `/medical-records/{medicalRecordId}/diagnoses` | Xem chẩn đoán đã lưu | ✅ | Theo `MEDICAL_RECORD_READ` |
+| `POST` | `/clinical-orders/visits/{visitId}` | Tạo chỉ định cận lâm sàng | ✅ | Theo `CLINICAL_ORDER_CREATE` |
+
+**Business Rules (QTN):**
+- **QTN-11:** Chỉ DOCTOR được phép ghi chẩn đoán; ADMIN bị loại trừ.
+- **QTN-22:** Chẩn đoán chính bắt buộc chọn mã bệnh đang dùng; chẩn đoán phụ là danh sách tùy chọn và có thể chọn mã hoặc nhập tự do.
+
+**Sample Payloads (chi tiết xem tại [`docs/api/diagnosis-and-orders-delivery.md`](docs/api/diagnosis-and-orders-delivery.md)):**
+
+**PUT /medical-records/{medicalRecordId}/diagnoses**
+```json
+{
+  "primaryDiagnosis": {
+    "diagnosisCatalogId": "a1000000-0000-0000-0000-000000000019",
+    "note": "Patient has runny nose"
+  },
+  "secondaryDiagnoses": [
+    { "name": "Fever", "note": "Monitor" }
+  ]
+}
+```
+
+---
+
+### 📋 Tra cứu Hồ sơ Bệnh án (NCL-04-CN-004)
+
+| Method | Endpoint | Mô tả | Vai trò |
+|--------|----------|-------|---------|
+| `GET` | `/medical-records/visits/{visitId}` | Chi tiết hồ sơ theo lượt khám (bệnh nhân + lượt khám + chẩn đoán ICD-10) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/patient/{patientId}` | Lịch sử hồ sơ của bệnh nhân (mới nhất trước) | ADMIN, DOCTOR |
+| `GET` | `/medical-records/{medicalRecordId}/access-logs` | Nhật ký truy cập theo hồ sơ | ADMIN, DOCTOR |
+| `GET` | `/medical-records/access-logs?patientId={patientId}` | Nhật ký truy cập theo bệnh nhân | ADMIN, DOCTOR |
+
+> ✅ Mọi lượt **đọc** hồ sơ đều tự động ghi **audit log** vào `medical_record_access_logs` (QTN-02). Chi tiết payload & Postman: [`docs/api/medical-record-retrieval.md`](docs/api/medical-record-retrieval.md)
+
 ---
 
 ## 🌍 Môi trường
 
 ### Backend Profiles
 
-| Profile | Database | Flyway | H2 Console | Log Level |
-|---------|----------|--------|------------|-----------|
-| **dev** (mặc định) | H2 in-memory | ❌ | ✅ | DEBUG |
-| **prod** | PostgreSQL | ✅ | ❌ | WARN |
+| Profile | Database | Flyway | Ghi chú | Log Level |
+|---------|----------|--------|---------|-----------|
+| **local** (mặc định) | MySQL 8 localhost:3306 (`digital_medical_record`) | ✅ | `show-sql=true` | INFO |
+| **dev** | TiDB Cloud — MySQL-compatible (`gateway01.ap-southeast-1.prod.aws.tidbcloud.com`) | ✅ | Dùng cho tích hợp | INFO / DEBUG |
+| **prod** | MySQL 8 (từ env `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`) | ✅ | `ddl-auto=validate` | WARN |
 
 ### Cấu hình JWT
 

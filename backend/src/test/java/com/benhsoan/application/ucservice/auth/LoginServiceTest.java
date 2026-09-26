@@ -1,0 +1,353 @@
+package com.benhsoan.application.ucservice.auth;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.TwoFactorChallenge;
+import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TemporaryPasswordExpiredException;
+import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
+import com.benhsoan.port.dto.command.auth.LoginCommand;
+import com.benhsoan.port.dto.result.LoginAttemptResult;
+import com.benhsoan.port.dto.result.LoginResult;
+import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
+import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
+import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
+import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
+
+@ExtendWith(MockitoExtension.class)
+class LoginServiceTest {
+
+        private static final Instant NOW = Instant.parse("2026-03-30T10:30:00Z");
+        private static final String USERNAME = "bacsi_an";
+        private static final String CORRECT_PASSWORD = "CorrectPassword123!";
+        private static final String WRONG_PASSWORD = "WrongPassword123!";
+
+        @Mock
+        private UserRepository userRepository;
+        @Mock
+        private RoleRepository roleRepository;
+        @Mock
+        private UserSessionRepository userSessionRepository;
+        @Mock
+        private PasswordEncoderPort passwordEncoderPort;
+        @Mock
+        private JwtTokenPort jwtTokenPort;
+        @Mock
+        private TokenHashPort tokenHashPort;
+        @Mock
+        private RefreshTokenGeneratorPort refreshTokenGeneratorPort;
+        @Mock
+        private LoginAttemptPort loginAttemptPort;
+        @Mock
+        private AuditLogRepository auditLogRepository;
+        @Mock
+        private LoginLockoutAuditWriter loginLockoutAuditWriter;
+        @Mock
+        private ClockPort clockPort;
+
+        @Mock
+        private TwoFactorAuthenticationService twoFactorAuthenticationService;
+
+        private LoginService loginService;
+
+        @BeforeEach
+        void setUp() {
+                loginService = new LoginService(
+                                userRepository,
+                                roleRepository,
+                                userSessionRepository,
+                                passwordEncoderPort,
+                                jwtTokenPort,
+                                tokenHashPort,
+                                refreshTokenGeneratorPort,
+                                loginAttemptPort,
+                                auditLogRepository,
+                                loginLockoutAuditWriter,
+                                clockPort,
+                                twoFactorAuthenticationService);
+        }
+
+        @Test
+        @DisplayName("TC-01: Nhập sai mật khẩu lần thứ 5 -> Khóa tạm ngay lập tức (HTTP 429) và ghi Audit Log LOCK")
+        void tc01_wrongPasswordFifthTime_immediatelyBlocksAndRecordsLockAuditLog() {
+                UUID userId = UUID.randomUUID();
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(5, true, true, NOW.plusSeconds(900), 900L));
+
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
+
+                TooManyLoginAttemptsException exception = assertThrows(
+                                TooManyLoginAttemptsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
+
+                assertEquals(900L, exception.getRetryAfterSeconds());
+                assertEquals(NOW.plusSeconds(900), exception.getBlockedUntil());
+
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
+
+                // Xác nhận gọi LoginLockoutAuditWriter để ghi nhận Audit Log LOCK an toàn trong
+                // REQUIRES_NEW transaction
+                verify(loginLockoutAuditWriter).writeUsernameLockout(
+                                userId,
+                                USERNAME,
+                                5,
+                                NOW.plusSeconds(900),
+                                null);
+        }
+
+        @Test
+        @DisplayName("Concurrent failed login: request thứ 6 chạm block nhưng không phải newlyBlocked -> không ghi duplicate Audit Log")
+        void concurrentFailedLogin_alreadyBlockedDoesNotDuplicateAuditLog() {
+                User user = mock(User.class);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(6, true, false, NOW.plusSeconds(900), 900L));
+
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
+
+                TooManyLoginAttemptsException exception = assertThrows(
+                                TooManyLoginAttemptsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
+
+                assertEquals(900L, exception.getRetryAfterSeconds());
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
+                verify(loginLockoutAuditWriter, never()).writeUsernameLockout(any(), any(), any(int.class), any(), any());
+        }
+
+        @Test
+        @DisplayName("TC-02: Đang trong thời gian khóa -> Nhập đúng mật khẩu vẫn bị chặn và trả về TooManyLoginAttemptsException")
+        void tc02_blockedUser_cannotLoginEvenWithCorrectPassword() {
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(true);
+                when(loginAttemptPort.getRetryAfterSeconds(USERNAME)).thenReturn(750L);
+                when(loginAttemptPort.getBlockedUntil(USERNAME)).thenReturn(NOW.plusSeconds(750));
+
+                TooManyLoginAttemptsException exception = assertThrows(
+                                TooManyLoginAttemptsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD)));
+
+                assertEquals(750L, exception.getRetryAfterSeconds());
+                assertEquals(NOW.plusSeconds(750), exception.getBlockedUntil());
+
+                // Kiểm tra không đi qua bước kiểm tra DB hay mật khẩu
+                verify(userRepository, never()).findByUsername(any());
+                verify(passwordEncoderPort, never()).matches(any(), any());
+        }
+
+        @Test
+        @DisplayName("TC-03: Nhập sai từ lần 1-4 rồi nhập đúng -> Đăng nhập thành công và reset attempt count")
+        void tc03_wrongPasswordThenCorrect_succeedsAndClearsAttempts() {
+                UUID userId = UUID.randomUUID();
+                UUID roleId = UUID.randomUUID();
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.getRoleId()).thenReturn(roleId);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                Role role = mock(Role.class);
+                when(role.getName()).thenReturn("DOCTOR");
+                when(role.getPermissions()).thenReturn(Set.of());
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+                when(clockPort.now()).thenReturn(NOW);
+                when(refreshTokenGeneratorPort.generate()).thenReturn("refresh_token_value");
+                when(tokenHashPort.hash(any())).thenReturn("hashed_token");
+                when(jwtTokenPort.generateToken(any(), any(), any(), any(), any())).thenReturn("jwt_access_token");
+                when(jwtTokenPort.getExpiredAt(any())).thenReturn(NOW.plusSeconds(3600));
+
+                LoginResult result = loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD));
+
+                assertNotNull(result);
+                assertEquals(USERNAME, result.username());
+                assertEquals("jwt_access_token", result.accessToken());
+
+                // Xác nhận loginSucceeded được gọi để reset đếm
+                verify(loginAttemptPort).loginSucceeded(USERNAME);
+        }
+
+        @Test
+        @DisplayName("Đăng nhập sai lần 1-4 -> Ném InvalidCredentialsException thông thường")
+        void wrongPasswordUnderThreshold_throwsInvalidCredentials() {
+                User user = mock(User.class);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(1, false, false, null, 0L));
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(WRONG_PASSWORD, "hashed_secret")).thenReturn(false);
+
+                assertThrows(
+                                InvalidCredentialsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
+
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
+                verify(auditLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Username không tồn tại sai lần thứ 5 -> Khóa tạm nhưng không ghi AuditLog với userId null")
+        void nonExistentUserFifthFailedAttempt_blocksWithoutAuditLogException() {
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(loginAttemptPort.recordLoginFailed(USERNAME))
+                                .thenReturn(new LoginAttemptResult(5, true, true, NOW.plusSeconds(900), 900L));
+
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
+
+                TooManyLoginAttemptsException exception = assertThrows(
+                                TooManyLoginAttemptsException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, WRONG_PASSWORD)));
+
+                assertEquals(900L, exception.getRetryAfterSeconds());
+                verify(loginAttemptPort).recordLoginFailed(USERNAME);
+                verify(auditLogRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Mật khẩu tạm thời đã hết hạn -> Ném TemporaryPasswordExpiredException và không tạo session")
+        void loginWithExpiredTemporaryPassword_throwsTemporaryPasswordExpiredException() {
+                User user = mock(User.class);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+                when(user.getTempPasswordExpiresAt()).thenReturn(NOW.minusSeconds(1)); // Expired 1 second ago
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(clockPort.now()).thenReturn(NOW);
+
+                assertThrows(
+                                TemporaryPasswordExpiredException.class,
+                                () -> loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD)));
+
+                // Session và token không được tạo khi mật khẩu tạm hết hạn
+                verify(userSessionRepository, never()).save(any());
+                verify(jwtTokenPort, never()).generateToken(any(), any(), any(), any(), any());
+                verify(user, never()).updateLastLogin(any());
+                verify(userRepository, never()).save(user);
+        }
+
+        @Test
+        @DisplayName("Mật khẩu tạm thời còn hạn -> Đăng nhập thành công, giữ mustChangePassword = true")
+        void loginWithValidTemporaryPassword_succeedsAndPreservesMustChangePassword() {
+                UUID userId = UUID.randomUUID();
+                UUID roleId = UUID.randomUUID();
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.getRoleId()).thenReturn(roleId);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+                when(user.getTempPasswordExpiresAt()).thenReturn(NOW.plusSeconds(3600)); // Valid for 1 more hour
+                when(user.isMustChangePassword()).thenReturn(true);
+
+                Role role = mock(Role.class);
+                when(role.getName()).thenReturn("DOCTOR");
+                when(role.getPermissions()).thenReturn(Set.of());
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+                when(clockPort.now()).thenReturn(NOW);
+                when(refreshTokenGeneratorPort.generate()).thenReturn("refresh_token_value");
+                when(tokenHashPort.hash(any())).thenReturn("hashed_token");
+                when(jwtTokenPort.generateToken(any(), any(), any(), any(), any())).thenReturn("jwt_access_token");
+                when(jwtTokenPort.getExpiredAt(any())).thenReturn(NOW.plusSeconds(3600));
+
+                LoginResult result = loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD));
+
+                assertNotNull(result);
+                assertEquals(USERNAME, result.username());
+                assertTrue(result.mustChangePassword());
+                verify(loginAttemptPort).loginSucceeded(USERNAME);
+                verify(userSessionRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("Vai trò bắt buộc 2FA -> Đăng nhập đúng mật khẩu trả về yêu cầu xác thực hai lớp, không tạo session/JWT")
+        void loginWhenRoleRequiresTwoFactor_returnsTwoFactorRequiredWithoutSession() {
+                UUID userId = UUID.randomUUID();
+                UUID roleId = UUID.randomUUID();
+                Instant expiresAt = NOW.plusSeconds(300);
+
+                User user = mock(User.class);
+                when(user.getId()).thenReturn(userId);
+                when(user.getUsername()).thenReturn(USERNAME);
+                when(user.getRoleId()).thenReturn(roleId);
+                when(user.isActive()).thenReturn(true);
+                when(user.getPasswordHash()).thenReturn("hashed_secret");
+
+                Role role = mock(Role.class);
+                when(role.getName()).thenReturn("DOCTOR");
+                when(role.isTwoFactorRequired()).thenReturn(true);
+
+                TwoFactorChallenge challenge = TwoFactorChallenge.create(userId, "hashed_code", expiresAt, NOW);
+
+                when(loginAttemptPort.isBlocked(USERNAME)).thenReturn(false);
+                when(userRepository.findByUsername(USERNAME)).thenReturn(Optional.of(user));
+                when(passwordEncoderPort.matches(CORRECT_PASSWORD, "hashed_secret")).thenReturn(true);
+                when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+                when(clockPort.now()).thenReturn(NOW);
+                when(twoFactorAuthenticationService.issueChallenge(user, NOW)).thenReturn(challenge);
+
+                LoginResult result = loginService.login(new LoginCommand(USERNAME, CORRECT_PASSWORD));
+
+                assertTrue(result.twoFactorRequired());
+                assertEquals(challenge.getId(), result.twoFactorToken());
+                assertEquals(expiresAt, result.twoFactorExpiresAt());
+                assertNull(result.accessToken());
+                assertNull(result.refreshToken());
+
+                // Không tạo session hay JWT thông thường trước khi xác thực lớp hai
+                verify(loginAttemptPort).loginSucceeded(USERNAME);
+                verify(userSessionRepository, never()).save(any());
+                verify(jwtTokenPort, never()).generateToken(any(), any(), any(), any(), any());
+        }
+}

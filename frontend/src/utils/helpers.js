@@ -1,43 +1,35 @@
-/**
- * Format date to Vietnamese locale
- */
 export const formatDate = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleDateString('vi-VN')
 }
 
-/**
- * Format date time to Vietnamese locale
- */
 export const formatDateTime = (date) => {
   if (!date) return ''
   return new Date(date).toLocaleString('vi-VN')
 }
 
-/**
- * Format gender
- */
 export const formatGender = (gender) => {
   const map = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' }
-  return map[gender] || gender
+  if (map[gender]) return map[gender]
+  if (['Nam', 'Nữ', 'Khác'].includes(gender)) return gender
+  return 'Không xác định'
 }
 
-/**
- * Format record status with badge color
- */
 export const formatRecordStatus = (status) => {
   const map = {
+    DRAFT: { label: 'Bản nháp', color: 'default' },
+    OPEN: { label: 'Đang mở', color: 'processing' },
+    SIGNED: { label: 'Đã ký', color: 'cyan' },
+    LOCKED: { label: 'Đã khóa', color: 'green' },
+    ARCHIVED: { label: 'Đã lưu trữ', color: 'purple' },
     NEW: { label: 'Mới', color: 'blue' },
     IN_PROGRESS: { label: 'Đang xử lý', color: 'orange' },
     COMPLETED: { label: 'Hoàn thành', color: 'green' },
     CANCELLED: { label: 'Đã hủy', color: 'red' },
   }
-  return map[status] || { label: status, color: 'default' }
+  return map[status] || { label: status || 'Không xác định', color: 'default' }
 }
 
-/**
- * Generate a random color from a string
- */
 export const stringToColor = (str) => {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -45,4 +37,26 @@ export const stringToColor = (str) => {
   }
   const color = `hsl(${hash % 360}, 70%, 50%)`
   return color
+}
+
+export const formatRecordCode = (recordId) => {
+  if (!recordId) return 'Chưa tạo'
+  const str = String(recordId).trim()
+  if (str.startsWith('BA-') || str.startsWith('MR-')) return str
+  if (str.length > 12) {
+    return `BA-${str.slice(0, 8).toUpperCase()}`
+  }
+  return `BA-${str.toUpperCase()}`
+}
+
+export const formatVisitCode = (visitCode, visitId) => {
+  if (visitCode && !visitCode.includes('-')) return visitCode
+  const id = visitCode || visitId
+  if (!id) return '—'
+  const str = String(id).trim()
+  if (str.startsWith('LK-') || str.startsWith('VIS')) return str
+  if (str.length > 12) {
+    return `LK-${str.slice(0, 8).toUpperCase()}`
+  }
+  return `LK-${str.toUpperCase()}`
 }

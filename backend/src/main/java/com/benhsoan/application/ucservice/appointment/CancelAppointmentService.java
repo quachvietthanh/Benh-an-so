@@ -1,0 +1,155 @@
+package com.benhsoan.application.ucservice.appointment;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.benhsoan.domain.appointment.Appointment;
+import com.benhsoan.domain.appointment.exception.AppointmentNotFoundException;
+import com.benhsoan.domain.appointment.exception.UnauthorizedAppointmentOperationException;
+import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.queue.QueueItem;
+import com.benhsoan.domain.queue.exception.CheckInConflictException;
+import com.benhsoan.domain.visit.Visit;
+import com.benhsoan.domain.visit.exception.VisitNotFoundException;
+import com.benhsoan.port.dto.command.appointment.CancelAppointmentCommand;
+import com.benhsoan.port.dto.query.appointment.GetWaitlistSuggestionQuery;
+import com.benhsoan.port.dto.result.AppointmentResult;
+import com.benhsoan.port.dto.result.appointment.WaitlistSuggestionResult;
+import com.benhsoan.port.inbound.appointment.CancelAppointmentUseCase;
+import com.benhsoan.port.inbound.appointment.GetWaitlistSuggestionUseCase;
+import com.benhsoan.port.outbound.repository.appointment.AppointmentRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.repository.queue.QueueItemRepository;
+import com.benhsoan.port.outbound.repository.visit.VisitRepository;
+import com.benhsoan.port.outbound.security.CurrentUserPort;
+import com.benhsoan.port.outbound.time.ClockPort;
+
+@Service
+@Transactional
+public class CancelAppointmentService implements CancelAppointmentUseCase {
+
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private final AppointmentRepository appointmentRepository;
+    private final CurrentUserPort currentUserPort;
+    private final AppointmentResultMapper appointmentResultMapper;
+    private final AuditLogRepository auditLogRepository;
+    private final QueueItemRepository queueItemRepository;
+    private final VisitRepository visitRepository;
+    private final ClockPort clockPort;
+    private final GetWaitlistSuggestionUseCase getWaitlistSuggestionUseCase;
+
+    public CancelAppointmentService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AppointmentResultMapper appointmentResultMapper,
+            AuditLogRepository auditLogRepository,
+            QueueItemRepository queueItemRepository,
+            VisitRepository visitRepository,
+            ClockPort clockPort
+    ) {
+        this(appointmentRepository, currentUserPort, appointmentResultMapper, auditLogRepository,
+                queueItemRepository, visitRepository, clockPort, null);
+    }
+
+    @Autowired
+    public CancelAppointmentService(
+            AppointmentRepository appointmentRepository,
+            CurrentUserPort currentUserPort,
+            AppointmentResultMapper appointmentResultMapper,
+            AuditLogRepository auditLogRepository,
+            QueueItemRepository queueItemRepository,
+            VisitRepository visitRepository,
+            ClockPort clockPort,
+            @Autowired(required = false) GetWaitlistSuggestionUseCase getWaitlistSuggestionUseCase
+    ) {
+        this.appointmentRepository = appointmentRepository;
+        this.currentUserPort = currentUserPort;
+        this.appointmentResultMapper = appointmentResultMapper;
+        this.auditLogRepository = auditLogRepository;
+        this.queueItemRepository = queueItemRepository;
+        this.visitRepository = visitRepository;
+        this.clockPort = clockPort;
+        this.getWaitlistSuggestionUseCase = getWaitlistSuggestionUseCase;
+    }
+
+    @Override
+    public AppointmentResult cancel(
+            UUID appointmentId,
+            CancelAppointmentCommand command
+    ) {
+        validatePermission();
+
+        Optional<QueueItem> linkedQueueItem = queueItemRepository.findByAppointmentId(appointmentId);
+        QueueItem lockedQueueItem = null;
+        Visit lockedVisit = null;
+        if (linkedQueueItem.isPresent()) {
+            lockedQueueItem = queueItemRepository.findByIdForUpdate(linkedQueueItem.orElseThrow().getId())
+                    .orElseThrow(() -> new CheckInConflictException(
+                            "Queue item disappeared during appointment cancellation."));
+            UUID visitId = lockedQueueItem.getVisitId();
+            lockedVisit = visitRepository.findByIdForUpdate(visitId)
+                    .orElseThrow(() -> new VisitNotFoundException(visitId));
+        }
+
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
+        appointment.cancel(command.cancelReason());
+
+        if (lockedQueueItem != null && lockedVisit != null) {
+            var cancelledAt = clockPort.now();
+            lockedQueueItem.cancel(command.cancelReason(), cancelledAt);
+            lockedVisit.cancel(cancelledAt);
+            queueItemRepository.save(lockedQueueItem);
+            visitRepository.save(lockedVisit);
+        }
+
+        Appointment saved = appointmentRepository.save(appointment);
+
+        auditLogRepository.save(
+                AuditLog.create(
+                        currentUserPort.getCurrentUserId(),
+                        ActionType.CANCEL,
+                        ResourceType.APPOINTMENT,
+                        saved.getId(),
+                        """
+                        {
+                        "appointmentCode":"%s",
+                        "cancelReason":"%s"
+                        }
+                        """.formatted(
+                                saved.getAppointmentCode(),
+                                command.cancelReason()
+                        ),
+                        null
+                )
+        );
+
+        // NCL-03-CN-012-TC-02: Gợi ý người chờ đầu tiên cùng ngày khi có lịch bị hủy
+        WaitlistSuggestionResult suggestedWaitlistEntry = null;
+        if (getWaitlistSuggestionUseCase != null && saved.getStartTime() != null) {
+            LocalDate appointmentDate = saved.getStartTime().atZone(CLINIC_ZONE).toLocalDate();
+            suggestedWaitlistEntry = getWaitlistSuggestionUseCase.getSuggestion(
+                    new GetWaitlistSuggestionQuery(saved.getDoctorId(), appointmentDate)
+            ).orElse(null);
+        }
+
+        return appointmentResultMapper.toResult(saved, List.of(), null, suggestedWaitlistEntry);
+    }
+
+    private void validatePermission() {
+        if (!currentUserPort.hasRole("ADMIN")
+                && !currentUserPort.hasRole("RECEPTIONIST")) {
+            throw new UnauthorizedAppointmentOperationException();
+        }
+    }
+}

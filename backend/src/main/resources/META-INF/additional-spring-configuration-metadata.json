@@ -1,0 +1,14 @@
+{"properties": [
+  {
+    "name": "app.jwt.secret",
+    "type": "java.lang.String",
+    "description": "JWT secret key used for signing and verifying access tokens.",
+    "defaultValue": "LOCAL_SECRET_CHANGE_ME_1234567890"
+  },
+  {
+    "name": "app.jwt.expiration-ms",
+    "type": "java.lang.Long",
+    "description": "JWT access token expiration time in milliseconds.",
+    "defaultValue": 1800000
+  }
+]}

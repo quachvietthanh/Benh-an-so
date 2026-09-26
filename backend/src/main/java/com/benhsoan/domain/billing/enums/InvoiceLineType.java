@@ -1,0 +1,15 @@
+package com.benhsoan.domain.billing.enums;
+
+public enum InvoiceLineType {
+
+    EXAM_FEE,
+
+    MEDICINE_FEE,
+
+    SERVICE_FEE,
+
+    ADJUSTMENT,
+
+    DISCOUNT
+}
+

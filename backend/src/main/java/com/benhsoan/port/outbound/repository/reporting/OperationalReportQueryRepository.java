@@ -1,0 +1,36 @@
+package com.benhsoan.port.outbound.repository.reporting;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+
+public interface OperationalReportQueryRepository {
+
+    long countCompletedVisits(Instant fromInclusive, Instant toExclusive);
+
+    boolean hasCompletedVisits(Instant fromInclusive, Instant toExclusive);
+
+    boolean hasInvoices(Instant fromInclusive, Instant toExclusive);
+
+    List<DailyVisitSummary> findDailyCompletedVisits(Instant fromInclusive, Instant toExclusive);
+
+    BigDecimal sumNetRevenue(Instant fromInclusive, Instant toExclusive);
+
+    List<DailyRevenueSummary> findDailyNetRevenue(Instant fromInclusive, Instant toExclusive);
+
+    List<TopMedicineSummary> findTopDispensedMedicines(Instant fromInclusive, Instant toExclusive);
+
+    List<DoctorVisitSummary> findDoctorVisitSummaries(Instant fromInclusive, Instant toExclusive);
+
+    List<InvoiceLineReportDetail> findInvoiceLineReportDetails(Instant fromInclusive, Instant toExclusive);
+
+    List<DiseasePatternSummary> findDiseasePatternSummaries(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
+
+    boolean hasDiagnoses(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
+
+    default List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive) {
+        return findCompletedVisitDetails(fromInclusive, toExclusive, null);
+    }
+
+    List<VisitReportDetailItem> findCompletedVisitDetails(Instant fromInclusive, Instant toExclusive, java.util.UUID doctorId);
+}

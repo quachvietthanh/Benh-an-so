@@ -1,0 +1,165 @@
+package com.benhsoan.adapter.inbound.rest.controller;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.benhsoan.adapter.inbound.rest.mapper.QueueRestMapper;
+import com.benhsoan.adapter.inbound.rest.request.queue.CheckInWalkInRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.CloseQueueItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.SkipQueueItemRequest;
+import com.benhsoan.adapter.inbound.rest.request.queue.UpdateQueueItemStatusRequest;
+import com.benhsoan.adapter.inbound.rest.response.queue.QueueCheckInResponse;
+import com.benhsoan.adapter.inbound.rest.response.queue.QueueItemResponse;
+import com.benhsoan.infrastructure.security.annotation.RequirePermission;
+import com.benhsoan.port.dto.command.queue.CallNextQueueItemCommand;
+import com.benhsoan.port.dto.command.queue.CheckInAppointmentCommand;
+import com.benhsoan.port.dto.command.queue.CompleteQueueItemCommand;
+import com.benhsoan.port.dto.command.queue.GetMyQueueQuery;
+import com.benhsoan.port.dto.command.queue.GetQueuesQuery;
+import com.benhsoan.port.inbound.queue.CallNextQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.CheckInAppointmentUseCase;
+import com.benhsoan.port.inbound.queue.CheckInWalkInUseCase;
+import com.benhsoan.port.inbound.queue.CloseVisitUseCase;
+import com.benhsoan.port.inbound.queue.CompleteQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.GetMyQueueUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueHistoryUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.GetQueuesUseCase;
+import com.benhsoan.adapter.inbound.rest.response.queue.QueueHistoryResponse;
+import com.benhsoan.port.dto.command.queue.ReQueueItemCommand;
+import com.benhsoan.adapter.inbound.rest.request.queue.PrioritizeQueueItemRequest;
+import com.benhsoan.port.inbound.queue.PrioritizeQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.ReQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.SkipQueueItemUseCase;
+import com.benhsoan.port.inbound.queue.UpdateQueueItemStatusUseCase;
+import com.benhsoan.port.inbound.queue.GetQueueDisplayUseCase;
+import com.benhsoan.port.dto.command.queue.GetQueueDisplayQuery;
+import com.benhsoan.adapter.inbound.rest.response.queue.WaitingRoomBoardResponse;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequiredArgsConstructor
+public class QueueController {
+
+    private final GetQueuesUseCase getQueuesUseCase;
+    private final GetMyQueueUseCase getMyQueueUseCase;
+    private final CheckInAppointmentUseCase checkInAppointmentUseCase;
+    private final CheckInWalkInUseCase checkInWalkInUseCase;
+    private final CallNextQueueItemUseCase callNextQueueItemUseCase;
+    private final UpdateQueueItemStatusUseCase updateQueueItemStatusUseCase;
+    private final CompleteQueueItemUseCase completeQueueItemUseCase;
+    private final CloseVisitUseCase closeVisitUseCase;
+    private final GetQueueItemUseCase getQueueItemUseCase;
+    private final SkipQueueItemUseCase skipQueueItemUseCase;
+    private final ReQueueItemUseCase reQueueItemUseCase;
+    private final PrioritizeQueueItemUseCase prioritizeQueueItemUseCase;
+    private final GetQueueHistoryUseCase getQueueHistoryUseCase;
+    private final GetQueueDisplayUseCase getQueueDisplayUseCase;
+    private final QueueRestMapper mapper;
+
+    @GetMapping("/queues/display")
+    public WaitingRoomBoardResponse getWaitingRoomDisplay(
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false) UUID roomId) {
+        return mapper.toResponse(getQueueDisplayUseCase.getWaitingRoomDisplay(new GetQueueDisplayQuery(date, roomId)));
+    }
+
+    @GetMapping("/queues")
+    @RequirePermission("QUEUE_VIEW")
+    public List<QueueItemResponse> getQueues(@RequestParam LocalDate date, @RequestParam(required = false) UUID doctorId,
+            @RequestParam(required = false) UUID roomId) {
+        return getQueuesUseCase.getQueues(new GetQueuesQuery(date, doctorId, roomId)).stream().map(mapper::toResponse).toList();
+    }
+
+    @GetMapping("/queues/me")
+    @RequirePermission("QUEUE_VIEW")
+    public List<QueueItemResponse> getMyQueue(@RequestParam LocalDate date) {
+        return getMyQueueUseCase.getMyQueue(new GetMyQueueQuery(date)).stream().map(mapper::toResponse).toList();
+    }
+
+    @PostMapping("/appointments/{appointmentId}/check-in")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission("QUEUE_CREATE")
+    public QueueCheckInResponse checkInAppointment(@PathVariable UUID appointmentId) {
+        return mapper.toResponse(checkInAppointmentUseCase.checkIn(new CheckInAppointmentCommand(appointmentId)));
+    }
+
+    @PostMapping("/queue-items/walk-in")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequirePermission("QUEUE_CREATE")
+    public QueueCheckInResponse checkInWalkIn(@Valid @RequestBody CheckInWalkInRequest request) {
+        return mapper.toResponse(checkInWalkInUseCase.checkIn(mapper.toCommand(request)));
+    }
+
+    @PostMapping("/queues/{queueId}/call-next")
+    @RequirePermission("QUEUE_CALL_NEXT")
+    public QueueItemResponse callNext(@PathVariable UUID queueId) {
+        return mapper.toResponse(callNextQueueItemUseCase.callNext(new CallNextQueueItemCommand(queueId)));
+    }
+
+    @PatchMapping("/queue-items/{itemId}/status")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse updateStatus(@PathVariable UUID itemId,
+            @Valid @RequestBody UpdateQueueItemStatusRequest request) {
+        return mapper.toResponse(updateQueueItemStatusUseCase.updateStatus(mapper.toCommand(itemId, request)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/complete")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse complete(@PathVariable UUID itemId) {
+        return mapper.toResponse(completeQueueItemUseCase.complete(new CompleteQueueItemCommand(itemId)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/close")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse close(@PathVariable UUID itemId,
+            @Valid @RequestBody CloseQueueItemRequest request) {
+        return mapper.toResponse(closeVisitUseCase.close(mapper.toCommand(itemId, request)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/skip")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse skip(@PathVariable UUID itemId, @Valid @RequestBody(required = false) SkipQueueItemRequest request) {
+        return mapper.toResponse(skipQueueItemUseCase.skip(mapper.toCommand(itemId, request)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/re-queue")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse reQueue(@PathVariable UUID itemId) {
+        return mapper.toResponse(reQueueItemUseCase.reQueue(new ReQueueItemCommand(itemId)));
+    }
+
+    @PostMapping("/queue-items/{itemId}/prioritize")
+    @RequirePermission("QUEUE_UPDATE_STATUS")
+    public QueueItemResponse prioritize(@PathVariable UUID itemId,
+            @Valid @RequestBody PrioritizeQueueItemRequest request) {
+        return mapper.toResponse(prioritizeQueueItemUseCase.prioritize(mapper.toCommand(itemId, request)));
+    }
+
+    @GetMapping("/queue-items/{itemId}/history")
+    @RequirePermission("QUEUE_VIEW")
+    public List<QueueHistoryResponse> getHistory(@PathVariable UUID itemId) {
+        return getQueueHistoryUseCase.getHistory(itemId).stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @GetMapping("/queue-items/{itemId}")
+    @RequirePermission("QUEUE_VIEW")
+    public QueueItemResponse getById(@PathVariable UUID itemId) {
+        return mapper.toResponse(getQueueItemUseCase.getById(itemId));
+    }
+}

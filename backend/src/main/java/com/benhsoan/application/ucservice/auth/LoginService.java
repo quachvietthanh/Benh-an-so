@@ -1,0 +1,244 @@
+package com.benhsoan.application.ucservice.auth;
+
+import java.time.Duration;
+import java.time.Instant;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.benhsoan.domain.auditlog.AuditLog;
+import com.benhsoan.domain.auditlog.enums.ActionType;
+import com.benhsoan.domain.auditlog.enums.ResourceType;
+import com.benhsoan.domain.auth.Role;
+import com.benhsoan.domain.auth.TwoFactorChallenge;
+import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.auth.UserSession;
+import com.benhsoan.domain.auth.exception.AccountDisabledException;
+import com.benhsoan.domain.auth.exception.InvalidCredentialsException;
+import com.benhsoan.domain.auth.exception.TemporaryPasswordExpiredException;
+import com.benhsoan.domain.auth.exception.TooManyLoginAttemptsException;
+import com.benhsoan.port.dto.command.auth.LoginCommand;
+import com.benhsoan.port.dto.result.LoginResult;
+import com.benhsoan.port.inbound.auth.LoginUseCase;
+import com.benhsoan.port.outbound.authSecurity.JwtTokenPort;
+import com.benhsoan.port.outbound.authSecurity.LoginAttemptPort;
+import com.benhsoan.port.outbound.authSecurity.PasswordEncoderPort;
+import com.benhsoan.port.outbound.authSecurity.RefreshTokenGeneratorPort;
+import com.benhsoan.port.outbound.authSecurity.TokenHashPort;
+import com.benhsoan.port.outbound.repository.auth.RoleRepository;
+import com.benhsoan.port.outbound.repository.auth.UserRepository;
+import com.benhsoan.port.outbound.repository.auth.UserSessionRepository;
+import com.benhsoan.port.outbound.repository.audit.AuditLogRepository;
+import com.benhsoan.port.outbound.time.ClockPort;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+@Service
+@Transactional
+public class LoginService implements LoginUseCase {
+
+    private static final Duration REFRESH_TOKEN_TIMEOUT = Duration.ofDays(7);
+
+    private final UserRepository userRepository;
+
+    private final RoleRepository roleRepository;
+
+    private final UserSessionRepository userSessionRepository;
+
+    private final PasswordEncoderPort passwordEncoderPort;
+
+    private final JwtTokenPort jwtTokenPort;
+
+    private final TokenHashPort tokenHashPort;
+
+    private final RefreshTokenGeneratorPort refreshTokenGeneratorPort;
+
+    private final LoginAttemptPort loginAttemptPort;
+
+    private final AuditLogRepository auditLogRepository;
+
+    private final LoginLockoutAuditWriter loginLockoutAuditWriter;
+
+    private final ClockPort clockPort;
+
+    private final TwoFactorAuthenticationService twoFactorAuthenticationService;
+
+    @Autowired
+    public LoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            LoginLockoutAuditWriter loginLockoutAuditWriter,
+            ClockPort clockPort,
+            TwoFactorAuthenticationService twoFactorAuthenticationService
+    ) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.userSessionRepository = userSessionRepository;
+        this.passwordEncoderPort = passwordEncoderPort;
+        this.jwtTokenPort = jwtTokenPort;
+        this.tokenHashPort = tokenHashPort;
+        this.refreshTokenGeneratorPort = refreshTokenGeneratorPort;
+        this.loginAttemptPort = loginAttemptPort;
+        this.auditLogRepository = auditLogRepository;
+        this.loginLockoutAuditWriter = loginLockoutAuditWriter;
+        this.clockPort = clockPort;
+        this.twoFactorAuthenticationService = twoFactorAuthenticationService;
+    }
+
+    public LoginService(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserSessionRepository userSessionRepository,
+            PasswordEncoderPort passwordEncoderPort,
+            JwtTokenPort jwtTokenPort,
+            TokenHashPort tokenHashPort,
+            RefreshTokenGeneratorPort refreshTokenGeneratorPort,
+            LoginAttemptPort loginAttemptPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            TwoFactorAuthenticationService twoFactorAuthenticationService
+    ) {
+        this(
+                userRepository,
+                roleRepository,
+                userSessionRepository,
+                passwordEncoderPort,
+                jwtTokenPort,
+                tokenHashPort,
+                refreshTokenGeneratorPort,
+                loginAttemptPort,
+                auditLogRepository,
+                new LoginLockoutAuditWriter(auditLogRepository),
+                clockPort,
+                twoFactorAuthenticationService
+        );
+    }
+
+    @Override
+    public LoginResult login(LoginCommand command) {
+
+        String username = command.username();
+
+        if (loginAttemptPort.isBlocked(username)) {
+            throw new TooManyLoginAttemptsException(
+                    loginAttemptPort.getRetryAfterSeconds(username),
+                    loginAttemptPort.getBlockedUntil(username));
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    var attemptResult = loginAttemptPort.recordLoginFailed(username);
+                    if (attemptResult.blocked()) {
+                        throw new TooManyLoginAttemptsException(
+                                attemptResult.retryAfterSeconds(),
+                                attemptResult.blockedUntil());
+                    }
+                    return new InvalidCredentialsException();
+                });
+
+        if (!user.isActive()) {
+            throw new AccountDisabledException();
+        }
+
+        if (!passwordEncoderPort.matches(
+                command.password(),
+                user.getPasswordHash()
+        )) {
+            var attemptResult = loginAttemptPort.recordLoginFailed(username);
+            if (attemptResult.blocked()) {
+                if (attemptResult.newlyBlocked()) {
+                    loginLockoutAuditWriter.writeUsernameLockout(
+                            user.getId(),
+                            user.getUsername(),
+                            attemptResult.attemptCount(),
+                            attemptResult.blockedUntil(),
+                            null
+                    );
+                }
+                throw new TooManyLoginAttemptsException(
+                        attemptResult.retryAfterSeconds(),
+                        attemptResult.blockedUntil());
+            }
+            throw new InvalidCredentialsException();
+        }
+
+        loginAttemptPort.loginSucceeded(username);
+
+        Instant now = clockPort.now();
+
+        if (user.getTempPasswordExpiresAt() != null && now.isAfter(user.getTempPasswordExpiresAt())) {
+            throw new TemporaryPasswordExpiredException(
+                    "Mật khẩu tạm thời đã hết hạn. Vui lòng liên hệ Quản trị viên để được cấp lại.");
+        }
+
+        Role role = roleRepository.findById(user.getRoleId())
+                .orElseThrow(IllegalStateException::new);
+
+        if (role.isTwoFactorRequired()) {
+            TwoFactorChallenge challenge = twoFactorAuthenticationService.issueChallenge(user, now);
+            return LoginResult.twoFactorRequired(
+                    user.getId(),
+                    user.getUsername(),
+                    role.getName(),
+                    challenge.getId(),
+                    challenge.getExpiresAt()
+            );
+        }
+
+        userSessionRepository.revokeByUserId(user.getId(), now);
+
+        String refreshToken = refreshTokenGeneratorPort.generate();
+
+        UserSession session =
+                UserSession.create(
+                        user.getId(),
+                        tokenHashPort.hash(refreshToken),
+                        now.plus(REFRESH_TOKEN_TIMEOUT),
+                        command.ipAddress(),
+                        command.userAgent()
+                );
+
+        userSessionRepository.save(session);
+
+        String accessToken = jwtTokenPort.generateToken(
+                user.getId(), session.getId(), user.getUsername(), role.getName(),
+                role.getPermissions().stream().map(permission -> permission.getCode()).collect(java.util.stream.Collectors.toSet()));
+        Instant expiredAt = jwtTokenPort.getExpiredAt(accessToken);
+
+        user.updateLastLogin(now);
+
+        userRepository.save(user);
+
+        auditLogRepository.save(
+                AuditLog.create(
+                        user.getId(),
+                        ActionType.LOGIN,
+                        ResourceType.USER_SESSION,
+                        session.getId(),
+                        """
+                        {
+                        "username":"%s"
+                        }
+                        """.formatted(user.getUsername()),
+                        null
+                )
+        );
+
+        return new LoginResult(
+                user.getId(),
+                user.getUsername(),
+                accessToken,
+                refreshToken,
+                role.getName(),
+                expiredAt,
+                user.isMustChangePassword()
+        );
+    }
+}

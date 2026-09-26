@@ -1,0 +1,1009 @@
+import React, { useMemo, useState } from 'react'
+import {
+  Avatar,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Divider,
+  Dropdown,
+  Form,
+  Input,
+  List,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
+import {
+  CheckCircleOutlined,
+  CheckCircleFilled,
+  CheckOutlined,
+  DeleteOutlined,
+  DownOutlined,
+  EllipsisOutlined,
+  FileSearchOutlined,
+  FileTextOutlined,
+  HeartOutlined,
+  MedicineBoxOutlined,
+  PlusOutlined,
+  PrinterOutlined,
+  SearchOutlined,
+  TableOutlined,
+  UpOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
+import { getDiseaseGroupName, icd10Categories } from '../../utils/icd10Data'
+import { fixMojibake } from '../../utils/serviceCatalogValidation'
+import { clinicalCategories, formatCurrency } from '../../utils/clinicalCatalogData'
+import MedicalRecordSignatureStamp from './MedicalRecordSignatureStamp'
+import DynamicMedicalRecordSections from './DynamicMedicalRecordSections'
+import PatientAllergyBanner from './PatientAllergyBanner'
+import PatientChronicDiseaseBanner from './PatientChronicDiseaseBanner'
+import EmergencyContactCard from '../patient/EmergencyContactCard'
+import DiagnosisCatalogAutocomplete from '../diagnosis-catalog/DiagnosisCatalogAutocomplete'
+import VitalSignCard from './VitalSignCard'
+import InstructionsAndTreatmentPlanCard from './InstructionsAndTreatmentPlanCard'
+import ComorbiditiesSection from './ComorbiditiesSection'
+import { formatTemplateName, formatSpecialtyName } from '../../constants/medicalRecordTemplateConstants'
+import { formatVisitCode } from '../../utils/helpers'
+
+const { Title, Text } = Typography
+
+const categoryMeta = {
+  RESPIRATORY: { label: 'Hô hấp', color: 'cyan' },
+  CIRCULATORY: { label: 'Tim mạch', color: 'red' },
+  DIGESTIVE: { label: 'Tiêu hóa', color: 'orange' },
+  ENDOCRINE: { label: 'Nội tiết', color: 'gold' },
+  MUSCULOSKELETAL: { label: 'Cơ xương khớp', color: 'geekblue' },
+  NERVOUS: { label: 'Thần kinh', color: 'purple' },
+  INFECTIOUS: { label: 'Nhiễm trùng', color: 'magenta' },
+  GENITOURINARY: { label: 'Tiết niệu', color: 'blue' },
+  SYMPTOMS: { label: 'Triệu chứng', color: 'volcano' },
+}
+
+function MedicalEncounterForm({
+  form,
+  isDoctor,
+  isSigned = false,
+  medicalRecord = null,
+  encounterContext,
+  selectedPatientObj,
+  vitalSigns,
+  setVitalSigns,
+  bmiValue,
+  onSaveVitalSigns,
+  onOpenVitalSignHistory,
+  vitalSignSaving = false,
+  vitalSignBackendFlags = [],
+  diagnosisType,
+  setDiagnosisType,
+  primaryIcd,
+  clearPrimaryDiagnosis,
+  selectPrimaryDiagnosis,
+  secondaryIcds,
+  setSecondaryIcds,
+  addSecondaryDiagnosis,
+  onUpdateSecondaryNote,
+  onSwitchToPrimary,
+  diagnosisOptions,
+  setDiagnosisModalOpen,
+  selectedOrders,
+  orderCategory,
+  setOrderCategory,
+  orderSearchQuery,
+  setOrderSearchQuery,
+  filteredCatalog,
+  handleAddOrder,
+  handleRemoveOrder,
+  handleToggleUrgent,
+  handleUpdateOrderNote,
+  totalOrderFee,
+  setPrintModalOpen,
+  serviceCatalogError,
+  onOpenSignModal,
+  onOpenAmendModal,
+  visitSpecialty = null,
+  availableTemplates = [],
+  selectedTemplateId = '',
+  onTemplateChange = () => {},
+  currentTemplate = null,
+  isFallbackTemplate = false,
+  templateLoading = false,
+  templateError = '',
+  onClearTemplateError = () => {},
+  currentUser = null,
+}) {
+  const [icdTableSearch, setIcdTableSearch] = useState('')
+  const [icdTableCategory, setIcdTableCategory] = useState('ALL')
+  const [showIcdTable, setShowIcdTable] = useState(false)
+  const [icdCardCollapsed, setIcdCardCollapsed] = useState(false)
+
+  const availableIcdList = useMemo(() => {
+    let list = diagnosisOptions || []
+    const q = icdTableSearch.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (item) =>
+          item.code.toLowerCase().includes(q) ||
+          (item.name && item.name.toLowerCase().includes(q)),
+      )
+    }
+    if (icdTableCategory !== 'ALL') {
+      list = list.filter((item) => item.category === icdTableCategory)
+    }
+    return list
+  }, [diagnosisOptions, icdTableSearch, icdTableCategory])
+
+  const hasCompletePricing = selectedOrders.every((order) => order.price != null)
+
+  return (
+    <Form form={form} layout="vertical" disabled={!isDoctor || isSigned}>
+      {isSigned && (
+        <div style={{ marginBottom: 16 }}>
+          <MedicalRecordSignatureStamp
+            signatureData={medicalRecord?.signatureData}
+            signedAt={medicalRecord?.signedAt}
+            signedBy={medicalRecord?.signedBy}
+            doctorName={encounterContext?.doctor?.fullName || 'Bác sĩ phụ trách'}
+            status={medicalRecord?.status || 'SIGNED'}
+          />
+        </div>
+      )}
+      {selectedPatientObj?.id && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <PatientAllergyBanner
+            patientId={selectedPatientObj?.id}
+            patientName={selectedPatientObj?.fullName}
+            visitId={encounterContext?.visit?.id}
+            currentUser={currentUser}
+            canWrite={isDoctor}
+          />
+          {Boolean(selectedPatientObj.emergencyContact || selectedPatientObj.emergencyPhone) && (
+            <div>
+              <EmergencyContactCard patient={selectedPatientObj} compact />
+            </div>
+          )}
+        </div>
+      )}
+      {selectedPatientObj?.id && (
+        <PatientChronicDiseaseBanner
+          patientId={selectedPatientObj?.id}
+          patientName={selectedPatientObj?.fullName}
+          visitId={encounterContext?.visit?.id}
+          currentUser={currentUser}
+          doctorName={encounterContext?.doctor?.fullName || currentUser?.fullName}
+        />
+      )}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={8}>
+          <Card
+            title={<span style={{ color: '#1E3A8A' }}><UserOutlined /> Thông tin lượt khám</span>}
+            style={{ marginBottom: 16 }}
+            bordered
+          >
+            <Form.Item name="patientId" hidden>
+              <Input />
+            </Form.Item>
+
+            <Descriptions size="small" column={1} bordered style={{ marginBottom: 12 }}>
+              <Descriptions.Item label="Mã lượt khám">
+                <Space size={4} align="center">
+                  <Tag
+                    color="blue"
+                    style={{
+                      fontFamily: 'monospace',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      padding: '1px 8px',
+                      borderRadius: 4,
+                      margin: 0,
+                    }}
+                  >
+                    {formatVisitCode(encounterContext?.visit?.visitCode, encounterContext?.visit?.id)}
+                  </Tag>
+                  {(encounterContext?.visit?.visitCode || encounterContext?.visit?.id) && (
+                    <Tooltip title={`Mã lượt khám đầy đủ: ${encounterContext?.visit?.visitCode || encounterContext?.visit?.id}`}>
+                      <Typography.Text
+                        copyable={{
+                          text: String(encounterContext?.visit?.visitCode || encounterContext?.visit?.id),
+                          tooltips: ['Sao chép mã', 'Đã sao chép!'],
+                        }}
+                        type="secondary"
+                        style={{ fontSize: 11 }}
+                      />
+                    </Tooltip>
+                  )}
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="Hàng đợi / STT">
+                {encounterContext?.queueItem ? (
+                  <Space size={6} align="center" wrap>
+                    <Tag
+                      color="blue"
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        padding: '1px 10px',
+                        borderRadius: 12,
+                        margin: 0,
+                      }}
+                    >
+                      STT #{encounterContext.queueItem.queueNumber || 1}
+                    </Tag>
+                    {encounterContext.queueItem.id && (
+                      <Tooltip title={`Mã lượt hàng đợi: ${encounterContext.queueItem.id}`}>
+                        <Typography.Text
+                          type="secondary"
+                          copyable={{
+                            text: String(encounterContext.queueItem.id),
+                            tooltips: ['Sao chép mã hàng đợi', 'Đã sao chép!'],
+                          }}
+                          style={{ fontSize: 11, fontFamily: 'monospace' }}
+                        >
+                          #{String(encounterContext.queueItem.id).slice(0, 8)}
+                        </Typography.Text>
+                      </Tooltip>
+                    )}
+                  </Space>
+                ) : (
+                  <Text type="secondary">Không có</Text>
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phòng">
+                <Tag color="cyan" style={{ fontWeight: 600 }}>{encounterContext?.room?.roomNumber || 'Chưa phân phòng'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Bác sĩ">
+                <Text strong style={{ color: '#1e3a8a' }}>{encounterContext?.doctor?.fullName || 'Chưa phân công'}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                <Tag color="processing">{encounterContext?.queueItem?.status || encounterContext?.visit?.status}</Tag>
+              </Descriptions.Item>
+            </Descriptions>
+
+            {selectedPatientObj && (
+              <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 8, border: '1px solid #E2E8F0', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <Avatar size={44} style={{ backgroundColor: '#2563EB', fontWeight: 600 }}>
+                    {selectedPatientObj.fullName?.substring(0, 2).toUpperCase()}
+                  </Avatar>
+                  <div>
+                    <Text strong style={{ fontSize: 15, display: 'block' }}>
+                      {selectedPatientObj.fullName}
+                    </Text>
+                    <Tag color="blue">{selectedPatientObj.patientCode}</Tag>
+                    <Tag color="purple">
+                      {selectedPatientObj.gender === 'MALE' ? 'Nam' : selectedPatientObj.gender === 'FEMALE' ? 'Nữ' : 'Khác'}
+                    </Tag>
+                  </div>
+                </div>
+                <Divider style={{ margin: '8px 0' }} />
+                <div style={{ fontSize: 12, lineHeight: '1.8' }}>
+                  <div><b>Ngày sinh:</b> {selectedPatientObj.dateOfBirth}</div>
+                  <div><b>Thẻ BHYT:</b> {selectedPatientObj.healthInsuranceCode || 'Không có'}</div>
+                  <div><b>Tiền sử bệnh:</b> <Text type="danger">{selectedPatientObj.medicalHistory || 'Chưa ghi nhận'}</Text></div>
+                  <div style={{ marginTop: 6 }}>
+                    <PatientAllergyBanner
+                      patientId={selectedPatientObj?.id}
+                      patientName={selectedPatientObj?.fullName}
+                      visitId={encounterContext?.visit?.id}
+                      currentUser={currentUser}
+                      canWrite={isDoctor}
+                      compact
+                    />
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <PatientChronicDiseaseBanner
+                      patientId={selectedPatientObj?.id}
+                      patientName={selectedPatientObj?.fullName}
+                      visitId={encounterContext?.visit?.id}
+                      currentUser={currentUser}
+                      doctorName={encounterContext?.doctor?.fullName || currentUser?.fullName}
+                      compact
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <EmergencyContactCard patient={selectedPatientObj} compact />
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <VitalSignCard
+            vitalSigns={vitalSigns}
+            onChange={setVitalSigns}
+            onSave={onSaveVitalSigns}
+            onOpenHistory={onOpenVitalSignHistory}
+            saving={vitalSignSaving}
+            readOnly={isSigned}
+            backendFlags={vitalSignBackendFlags}
+            patientId={selectedPatientObj?.id || encounterContext?.patient?.id || encounterContext?.visit?.patientId}
+          />
+        </Col>
+
+        <Col xs={24} lg={16}>
+          <Card
+            size="small"
+            style={{
+              marginBottom: 16,
+              background: '#f8fafc',
+              borderColor: '#cbd5e1',
+              borderRadius: 8,
+            }}
+            bodyStyle={{ padding: '10px 14px' }}
+          >
+            <Row gutter={[12, 8]} align="middle">
+              <Col xs={24} sm={9}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text strong style={{ fontSize: 13, color: '#334155', minWidth: 85 }}>
+                    Chuyên khoa:
+                  </Text>
+                  <Tag color="blue" style={{ fontSize: 13, padding: '2px 8px', fontWeight: 600, margin: 0 }}>
+                    {formatSpecialtyName(visitSpecialty?.name || currentTemplate?.specialty?.name || encounterContext?.visit?.specialtyName || 'Đa khoa')}
+                  </Tag>
+                </div>
+              </Col>
+              <Col xs={24} sm={15}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text strong style={{ fontSize: 13, color: '#334155', minWidth: 90 }}>
+                    Mẫu bệnh án:
+                  </Text>
+                  <Select
+                    size="middle"
+                    style={{ flex: 1 }}
+                    value={selectedTemplateId || currentTemplate?.templateId || currentTemplate?.id || undefined}
+                    onChange={onTemplateChange}
+                    disabled={!isDoctor || isSigned}
+                    placeholder="Chọn mẫu áp dụng..."
+                    options={availableTemplates.map((t) => ({
+                      value: t.templateId || t.id,
+                      label: `${formatTemplateName(t.name)} (v${t.versionNo || t.currentVersionNo || 1})${t.defaultTemplate ? ' [Mặc định]' : ''}`,
+                    }))}
+                  />
+                </div>
+              </Col>
+            </Row>
+            {isFallbackTemplate && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#b45309', background: '#fffbeb', padding: '4px 8px', borderRadius: 4, border: '1px solid #fef3c7' }}>
+                ℹ️ Chuyên khoa chưa có mẫu bệnh án riêng, hệ thống tự động áp dụng mẫu <b>Đa khoa mặc định</b>.
+              </div>
+            )}
+            {templateError && (
+              <Alert
+                type="error"
+                showIcon
+                message={templateError}
+                closable
+                onClose={onClearTemplateError}
+                style={{ marginTop: 8 }}
+              />
+            )}
+          </Card>
+
+          <DynamicMedicalRecordSections
+            sections={currentTemplate?.sections}
+            template={currentTemplate}
+            disabled={!isDoctor || isSigned}
+          />
+
+          <Card
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ color: '#2563EB', fontWeight: 700 }}>
+                  <FileSearchOutlined /> Phân loại và mã bệnh chẩn đoán (ICD-10)
+                </span>
+                <Space size={8}>
+                  <Button
+                    type="dashed"
+                    icon={<SearchOutlined />}
+                    size="small"
+                    onClick={() => setDiagnosisModalOpen(true)}
+                  >
+                    Tra cứu mã ICD-10
+                  </Button>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={icdCardCollapsed ? <DownOutlined /> : <UpOutlined />}
+                    onClick={() => setIcdCardCollapsed(!icdCardCollapsed)}
+                    title={icdCardCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                  />
+                </Space>
+              </div>
+            }
+            style={{ marginBottom: 16 }}
+            bodyStyle={{
+              padding: icdCardCollapsed ? 0 : '12px 16px',
+              display: icdCardCollapsed ? 'none' : 'block',
+            }}
+            bordered
+          >
+            <Row gutter={[12, 10]}>
+              <Col xs={24} md={8}>
+                <Form.Item label={<span style={{ fontWeight: 600, color: '#1e293b' }}>Loại chẩn đoán y khoa</span>} style={{ marginBottom: 10 }}>
+                  <Select
+                    value={diagnosisType}
+                    onChange={setDiagnosisType}
+                    options={[
+                      { value: 'PRELIMINARY', label: 'Chẩn đoán Sơ bộ (Lâm sàng)' },
+                      { value: 'DEFINITIVE', label: 'Chẩn đoán xác định (có cận lâm sàng)' },
+                      { value: 'DIFFERENTIAL', label: 'Chẩn đoán Phân biệt' },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={16}>
+                <Form.Item
+                  label={
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                      Chẩn đoán chính (Mã ICD-10) <span style={{ color: '#ef4444' }}>*</span>
+                    </span>
+                  }
+                  required={false}
+                  style={{ marginBottom: 10 }}
+                >
+                  {primaryIcd ? (
+                    <div style={{ background: '#F0FDF4', padding: '6px 12px', borderRadius: 6, border: '1px solid #BBF7D0', minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                      <Space size={6} wrap align="center">
+                        <Tag color="blue" style={{ fontSize: 13, fontWeight: 700, padding: '1px 6px', borderRadius: 4, margin: 0 }}>
+                          {primaryIcd.code}
+                        </Tag>
+                        <Text strong style={{ fontSize: 13, color: '#0F172A' }}>
+                          {fixMojibake(primaryIcd.name)}
+                        </Text>
+                        <Tag color={categoryMeta[primaryIcd.category]?.color || 'cyan'} style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>
+                          Nhóm: {primaryIcd.diseaseGroup || getDiseaseGroupName(primaryIcd.code, primaryIcd.diseaseGroup)}
+                        </Tag>
+                      </Space>
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={clearPrimaryDiagnosis} style={{ fontWeight: 600, height: 26, padding: '0 6px' }}>
+                        Đổi mã
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <DiagnosisCatalogAutocomplete
+                        placeholder="🔍 Tra cứu mã bệnh theo mã ICD (J00, I10...) hoặc tên bệnh..."
+                        value={null}
+                        style={{ width: '100%' }}
+                        fallbackSuggestions={diagnosisOptions}
+                        onSelect={(item) => selectPrimaryDiagnosis(item)}
+                      />
+                    </div>
+                  )}
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {!primaryIcd && (
+              <div style={{ marginTop: 0, marginBottom: 12 }}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'inline-block', marginRight: 6 }}>
+                  Gợi ý thường gặp:
+                </Text>
+                <Space wrap size={[4, 4]}>
+                  {diagnosisOptions.slice(0, 8).map((icd) => (
+                    <Tag
+                      key={icd.code}
+                      color="cyan"
+                      style={{ cursor: 'pointer', padding: '1px 6px', fontSize: 11.5, borderRadius: 4, margin: 0 }}
+                      onClick={() => selectPrimaryDiagnosis(icd)}
+                    >
+                      <b>{icd.code}</b> - {fixMojibake(icd.name).split('(')[0].trim()}
+                    </Tag>
+                  ))}
+                </Space>
+              </div>
+            )}
+
+            <ComorbiditiesSection
+              primaryIcd={primaryIcd}
+              secondaryIcds={secondaryIcds}
+              onAddSecondary={addSecondaryDiagnosis}
+              onRemoveSecondary={(codeOrId) =>
+                setSecondaryIcds((prev) =>
+                  prev.filter(
+                    (i) => (i.code ? i.code !== codeOrId : (i.id !== codeOrId && i.name !== codeOrId && i.rawName !== codeOrId))
+                  )
+                )
+              }
+              onUpdateSecondaryNote={onUpdateSecondaryNote}
+              onSwitchToPrimary={onSwitchToPrimary || ((item) => {
+                selectPrimaryDiagnosis(item)
+                setSecondaryIcds((prev) =>
+                  prev.filter((i) => (i.code ? i.code !== item.code : (i.id !== item.id && i.name !== item.name)))
+                )
+              })}
+              isSigned={isSigned}
+              isDoctor={isDoctor}
+              diagnosisOptions={diagnosisOptions}
+            />
+
+            <Divider style={{ margin: '16px 0 12px' }} />
+
+            <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 10, border: '1px solid #E2E8F0', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <TableOutlined style={{ color: '#2563EB', fontSize: 16 }} />
+                  <Text strong style={{ fontSize: 14, color: '#1E293B' }}>
+                    Bảng chọn mã bệnh chẩn đoán (ICD-10)
+                  </Text>
+                  <Tag color="blue" style={{ margin: 0 }}>
+                    {availableIcdList.length} mã bệnh
+                  </Tag>
+                </div>
+                <Button
+                  size="middle"
+                  type="primary"
+                  ghost
+                  onClick={() => setShowIcdTable((prev) => !prev)}
+                  style={{ fontWeight: 600, height: 32, padding: '0 14px', borderRadius: 6 }}
+                >
+                  {showIcdTable ? 'Thu gọn bảng' : 'Mở rộng bảng chọn'}
+                </Button>
+              </div>
+
+              {showIcdTable && (
+                <>
+                  <Row gutter={[8, 8]} style={{ marginBottom: 10 }}>
+                    <Col xs={24} sm={14}>
+                      <Input
+                        allowClear
+                        placeholder="Tìm nhanh theo mã (J00, I10, K21...) hoặc tên bệnh..."
+                        prefix={<SearchOutlined style={{ color: '#94A3B8' }} />}
+                        value={icdTableSearch}
+                        onChange={(e) => setIcdTableSearch(e.target.value)}
+                      />
+                    </Col>
+                    <Col xs={24} sm={10}>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={icdTableCategory}
+                        onChange={setIcdTableCategory}
+                        options={icd10Categories.map((item) => ({
+                          value: item.key,
+                          label: item.label,
+                        }))}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Table
+                    size="small"
+                    rowKey={(record) => record.code}
+                    dataSource={availableIcdList}
+                    rowClassName={(record) => {
+                      if (record.code === primaryIcd?.code) return 'icd-row-primary'
+                      if (secondaryIcds.some((s) => s.code === record.code)) return 'icd-row-secondary'
+                      return ''
+                    }}
+                    pagination={{
+                      pageSize: 5,
+                      size: 'small',
+                      showSizeChanger: true,
+                      pageSizeOptions: ['5', '10', '20'],
+                      showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} mã bệnh`,
+                    }}
+                    columns={[
+                      {
+                        title: 'Mã ICD',
+                        dataIndex: 'code',
+                        key: 'code',
+                        width: 85,
+                        align: 'center',
+                        render: (code) => (
+                          <Tag color="blue" style={{ fontWeight: 700, fontSize: 12.5, margin: 0 }}>
+                            {code}
+                          </Tag>
+                        ),
+                      },
+                      {
+                        title: 'Tên bệnh / Chẩn đoán y khoa',
+                        dataIndex: 'name',
+                        key: 'name',
+                        render: (name) => (
+                          <Text strong style={{ fontSize: 13, color: '#1E293B' }}>
+                            {fixMojibake(name)}
+                          </Text>
+                        ),
+                      },
+                      {
+                        title: 'Nhóm bệnh / Chuyên khoa',
+                        dataIndex: 'diseaseGroup',
+                        key: 'diseaseGroup',
+                        width: 175,
+                        align: 'center',
+                        render: (_, record) => {
+                          const groupName = record.diseaseGroup || getDiseaseGroupName(record.code, record.diseaseGroup)
+                          const meta = categoryMeta[record.category]
+                          return <Tag color={meta?.color || 'default'} style={{ margin: 0, fontSize: 12 }}>{groupName}</Tag>
+                        },
+                      },
+                      {
+                        title: 'Thao tác chọn',
+                        key: 'actions',
+                        width: 185,
+                        align: 'center',
+                        render: (_, record) => {
+                          const isPrimary = primaryIcd?.code === record.code
+                          const isSecondary = secondaryIcds.some((s) => s.code === record.code)
+
+                          if (isPrimary) {
+                            return (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <Tag
+                                  color="success"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    height: 28,
+                                    lineHeight: '26px',
+                                    padding: '0 8px',
+                                    borderRadius: 6,
+                                    fontWeight: 600,
+                                    fontSize: 12.5,
+                                    margin: 0,
+                                    border: '1px solid #86efac',
+                                    backgroundColor: '#f0fdf4',
+                                    color: '#16a34a',
+                                  }}
+                                >
+                                  <CheckCircleFilled style={{ color: '#16a34a' }} />
+                                  <span>Chẩn đoán chính</span>
+                                </Tag>
+                                <Dropdown
+                                  menu={{
+                                    items: [
+                                      {
+                                        key: 'switch-secondary',
+                                        icon: <PlusOutlined style={{ color: '#7c3aed' }} />,
+                                        label: 'Chuyển thành chẩn đoán phụ',
+                                        onClick: () => {
+                                          clearPrimaryDiagnosis()
+                                          addSecondaryDiagnosis(record)
+                                        },
+                                      },
+                                      {
+                                        type: 'divider',
+                                      },
+                                      {
+                                        key: 'remove-primary',
+                                        icon: <DeleteOutlined />,
+                                        danger: true,
+                                        label: 'Bỏ chọn chẩn đoán này',
+                                        onClick: () => clearPrimaryDiagnosis(),
+                                      },
+                                    ],
+                                  }}
+                                  trigger={['click']}
+                                  placement="bottomRight"
+                                >
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<EllipsisOutlined style={{ fontSize: 18, color: '#16a34a' }} />}
+                                    style={{ width: 26, height: 28, padding: 0 }}
+                                    title="Thao tác khác"
+                                  />
+                                </Dropdown>
+                              </div>
+                            )
+                          }
+
+                          if (isSecondary) {
+                            return (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <Tag
+                                  color="purple"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    height: 28,
+                                    lineHeight: '26px',
+                                    padding: '0 8px',
+                                    borderRadius: 6,
+                                    fontWeight: 600,
+                                    fontSize: 12,
+                                    margin: 0,
+                                  }}
+                                >
+                                  <CheckOutlined style={{ color: '#9333ea' }} />
+                                  <span>Chẩn đoán phụ</span>
+                                </Tag>
+                                <Dropdown
+                                  menu={{
+                                    items: [
+                                      {
+                                        key: 'switch-primary',
+                                        icon: <CheckCircleOutlined style={{ color: '#2563eb' }} />,
+                                        label: 'Chuyển thành chẩn đoán chính',
+                                        onClick: () => {
+                                          setSecondaryIcds((prev) => prev.filter((i) => i.code !== record.code))
+                                          selectPrimaryDiagnosis(record)
+                                        },
+                                      },
+                                      {
+                                        type: 'divider',
+                                      },
+                                      {
+                                        key: 'remove-secondary',
+                                        icon: <DeleteOutlined />,
+                                        danger: true,
+                                        label: 'Xóa khỏi chẩn đoán phụ',
+                                        onClick: () => setSecondaryIcds((prev) => prev.filter((i) => i.code !== record.code)),
+                                      },
+                                    ],
+                                  }}
+                                  trigger={['click']}
+                                  placement="bottomRight"
+                                >
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<EllipsisOutlined style={{ fontSize: 18, color: '#9333ea' }} />}
+                                    style={{ width: 26, height: 28, padding: 0 }}
+                                    title="Thao tác khác"
+                                  />
+                                </Dropdown>
+                              </div>
+                            )
+                          }
+
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Dropdown
+                                menu={{
+                                  items: [
+                                    {
+                                      key: 'choose-primary',
+                                      icon: <CheckCircleOutlined style={{ color: '#2563eb' }} />,
+                                      label: 'Chọn làm chẩn đoán chính',
+                                      onClick: () => selectPrimaryDiagnosis(record),
+                                    },
+                                    {
+                                      key: 'choose-secondary',
+                                      icon: <PlusOutlined style={{ color: '#7c3aed' }} />,
+                                      label: primaryIcd ? 'Thêm làm chẩn đoán phụ' : 'Thêm làm chẩn đoán phụ (cần CĐ chính trước)',
+                                      disabled: !primaryIcd,
+                                      onClick: () => addSecondaryDiagnosis(record),
+                                    },
+                                  ],
+                                }}
+                                trigger={['click']}
+                                placement="bottomRight"
+                              >
+                                <Button
+                                  size="small"
+                                  icon={<EllipsisOutlined style={{ fontSize: 18 }} />}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 34,
+                                    height: 32,
+                                    borderRadius: 6,
+                                  }}
+                                  title="Chọn thao tác chẩn đoán..."
+                                />
+                              </Dropdown>
+                            </div>
+                          )
+                        },
+                      },
+                    ]}
+                  />
+                </>
+              )}
+            </div>
+          </Card>
+
+          <InstructionsAndTreatmentPlanCard
+            form={form}
+            medicalRecordId={medicalRecord?.id || medicalRecord?.medicalRecordId || encounterContext?.medicalRecord?.id}
+            visitDate={encounterContext?.visit?.createdAt || encounterContext?.visit?.actualDate || encounterContext?.visitDate}
+            isSigned={isSigned}
+            onOpenAmendModal={onOpenAmendModal}
+          />
+        </Col>
+      </Row>
+
+      <Card
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#16A34A' }}><FileTextOutlined /> Nhập Chỉ Định Cận Lâm Sàng</span>
+            {selectedOrders.length > 0 && (
+              <Tag color="green" style={{ fontSize: 13, padding: '4px 10px' }}>
+                Tổng chi phí chỉ định: <b>{formatCurrency(totalOrderFee)}</b>
+              </Tag>
+            )}
+          </div>
+        }
+        bordered
+        style={{ marginTop: 16 }}
+      >
+        {serviceCatalogError && (
+          <div style={{ color: '#b42318', marginBottom: 12 }}>
+            {serviceCatalogError}
+          </div>
+        )}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={10} style={{ display: 'flex' }}>
+            <Card
+              size="small"
+              title="Danh mục dịch vụ cận lâm sàng"
+              style={{ width: '100%', height: '100%', borderRadius: 12, borderColor: '#DCE7E1' }}
+              bodyStyle={{ background: '#F8FAFC', borderRadius: '0 0 12px 12px' }}
+            >
+
+              <Input
+                prefix={<SearchOutlined />}
+                placeholder="Tìm xét nghiệm, X-quang, siêu âm..."
+                value={orderSearchQuery}
+                onChange={(e) => setOrderSearchQuery(e.target.value)}
+                style={{ marginBottom: 10 }}
+                allowClear
+              />
+
+              <Select
+                value={orderCategory}
+                onChange={setOrderCategory}
+                style={{ width: '100%', marginBottom: 12 }}
+                options={clinicalCategories.map((c) => ({ value: c.key, label: c.label }))}
+              />
+
+              <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                <List
+                  size="small"
+                  dataSource={filteredCatalog}
+                  renderItem={(item) => {
+                    const isAdded = selectedOrders.some((o) => o.code === item.code)
+                    return (
+                      <List.Item
+                        actions={[
+                          <Button
+                            size="small"
+                            type={isAdded ? 'default' : 'primary'}
+                            disabled={isAdded}
+                            icon={isAdded ? <CheckCircleOutlined /> : <PlusOutlined />}
+                            onClick={() => handleAddOrder(item)}
+                          >
+                            {isAdded ? 'Đã chọn' : 'Thêm'}
+                          </Button>,
+                        ]}
+                      >
+                        <List.Item.Meta
+                          title={
+                            <Text strong style={{ fontSize: 13 }}>
+                              {item.name}
+                            </Text>
+                          }
+                          description={
+                            <div style={{ fontSize: 11 }}>
+                              <Tag color="cyan">{item.code}</Tag>
+                              <Text type={item.price == null ? 'secondary' : 'danger'} strong>
+                                {item.price == null ? 'Chưa cập nhật giá' : formatCurrency(item.price)}
+                              </Text> | {item.department}
+                            </div>
+                          }
+                        />
+                      </List.Item>
+                    )
+                  }}
+                />
+              </div>
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={14} style={{ display: 'flex' }}>
+            <Card
+              size="small"
+              title={`Dịch vụ đã chọn (${selectedOrders.length})`}
+              style={{ width: '100%', height: '100%', borderRadius: 12, borderColor: '#DCE7E1' }}
+            >
+              {selectedOrders.length === 0 ? (
+                <div style={{ border: '2px dashed #CBD5E1', padding: 40, textAlign: 'center', borderRadius: 10, color: '#64748B' }}>
+                  <FileTextOutlined style={{ fontSize: 32, marginBottom: 8, color: '#94A3B8' }} />
+                  <div>Chưa có dịch vụ cận lâm sàng nào được chỉ định.</div>
+                  <div style={{ fontSize: 12 }}>Chọn dịch vụ từ danh mục bên trái để thêm vào phiếu.</div>
+                </div>
+              ) : (
+                <div>
+                  <Table
+                    size="small"
+                    rowKey="code"
+                    pagination={false}
+                    dataSource={selectedOrders}
+                    columns={[
+                      {
+                        title: 'Dịch vụ',
+                        key: 'name',
+                        render: (r) => (
+                          <div>
+                            <Text strong>{r.name}</Text>
+                            <div style={{ fontSize: 11, color: '#64748B' }}>Mã: {r.code} - {r.department}</div>
+                          </div>
+                        ),
+                      },
+                      {
+                        title: 'Ưu tiên',
+                        key: 'urgent',
+                        width: 90,
+                        render: (r) => (
+                          <Button
+                            size="small"
+                            type={r.isUrgent ? 'primary' : 'default'}
+                            danger={r.isUrgent}
+                            onClick={() => handleToggleUrgent(r.code)}
+                          >
+                            {r.isUrgent ? 'Khẩn' : 'Thường'}
+                          </Button>
+                        ),
+                      },
+                      {
+                        title: 'Ghi chú kỹ thuật',
+                        key: 'note',
+                        width: 170,
+                        render: (r) => (
+                          <Input
+                            size="small"
+                            placeholder="Nhịn ăn, tư thế chụp..."
+                            value={r.note}
+                            onChange={(e) => handleUpdateOrderNote(r.code, e.target.value)}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Chi phí',
+                        dataIndex: 'price',
+                        width: 100,
+                        align: 'right',
+                        render: (val) => (val == null ? 'Chưa cập nhật' : formatCurrency(val)),
+                      },
+                      {
+                        title: '',
+                        key: 'action',
+                        width: 44,
+                        render: (r) => (
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            aria-label={`Xóa dịch vụ ${r.name}`}
+                            onClick={() => handleRemoveOrder(r.code)}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                    <Button
+                      icon={<PrinterOutlined />}
+                      onClick={() => setPrintModalOpen(true)}
+                      style={{ height: 36, fontWeight: 600, borderRadius: 6, padding: '0 16px' }}
+                    >
+                      Xem trước và in phiếu
+                    </Button>
+                    <Text strong style={{ fontSize: 15 }}>
+                      {hasCompletePricing
+                        ? <>Tổng tạm tính: <span style={{ color: '#DC2626' }}>{formatCurrency(totalOrderFee)}</span></>
+                        : 'Chưa có đủ dữ liệu bảng giá'}
+                    </Text>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      </Card>
+
+    </Form>
+  )
+}
+
+export default MedicalEncounterForm

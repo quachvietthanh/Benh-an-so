@@ -1,0 +1,143 @@
+package com.benhsoan.application.ucservice.portal;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.benhsoan.domain.appointment.Appointment;
+import com.benhsoan.domain.appointment.AppointmentRescheduleLog;
+import com.benhsoan.domain.auth.User;
+import com.benhsoan.domain.patient.Patient;
+import com.benhsoan.domain.portal.notification.PatientPortalNotification;
+import com.benhsoan.domain.portal.notification.PatientPortalNotificationType;
+import com.benhsoan.port.outbound.repository.patient.PatientRepository;
+import com.benhsoan.port.outbound.repository.portal.PatientPortalNotificationRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * NCL-14-CN-008 CV-03: creates the three patient-portal notification kinds at the
+ * existing business trigger points. Notifications are only written for patients
+ * that actually have a patient-portal account ({@code Patient.userId} linked), and
+ * each kind is guarded against duplicate creation.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public class PatientPortalNotificationCreator {
+
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm 'ngày' dd/MM/yyyy").withZone(CLINIC_ZONE);
+
+    private static final String REMINDER_TITLE = "Nhắc lịch hẹn";
+    private static final String CHANGED_TITLE = "Lịch hẹn đã thay đổi";
+    private static final String LAB_RESULT_TITLE = "Kết quả cận lâm sàng mới";
+    private static final String LAB_RESULT_MESSAGE = "Bạn có kết quả cận lâm sàng mới.";
+
+    // NCL-14-CN-010 TC-03: the link is only proposed for removal, never removed automatically.
+    private static final String GUARDIAN_REVIEW_TITLE = "Rà soát liên kết người giám hộ";
+    private static final String GUARDIAN_REVIEW_MESSAGE =
+            "Hồ sơ %s đã đủ 18 tuổi. Vui lòng rà soát để gỡ bỏ liên kết người giám hộ.";
+
+    private final PatientPortalNotificationRepository notificationRepository;
+    private final PatientRepository patientRepository;
+
+    public void createAppointmentReminder(Appointment appointment, Patient patient, User doctor, Instant now) {
+        if (patient == null || patient.getUserId() == null) {
+            return;
+        }
+        UUID patientId = appointment.getPatientId();
+        if (notificationRepository.existsByPatientIdAndTypeAndAppointmentId(
+                patientId, PatientPortalNotificationType.APPOINTMENT_REMINDER, appointment.getId())) {
+            return;
+        }
+        String message = "Bạn có lịch hẹn lúc " + TIME_FORMATTER.format(appointment.getStartTime())
+                + ". Mã lịch hẹn: " + appointment.getAppointmentCode()
+                + ". Bác sĩ: " + doctor.getFullName() + ".";
+        notificationRepository.save(PatientPortalNotification.reminder(
+                patientId, REMINDER_TITLE, message, appointment.getId(), now));
+    }
+
+    public void createAppointmentChanged(Appointment appointment, AppointmentRescheduleLog log, Instant now) {
+        Optional<Patient> patient = patientRepository.findById(appointment.getPatientId());
+        if (patient.isEmpty() || patient.get().getUserId() == null) {
+            return;
+        }
+        UUID patientId = appointment.getPatientId();
+        if (notificationRepository.existsByPatientIdAndTypeAndRescheduleLogId(
+                patientId, PatientPortalNotificationType.APPOINTMENT_CHANGED, log.getId())) {
+            return;
+        }
+        String message = "Lịch hẹn " + appointment.getAppointmentCode()
+                + " đã được dời từ " + TIME_FORMATTER.format(log.getOldStartTime())
+                + " sang " + TIME_FORMATTER.format(log.getNewStartTime()) + ".";
+        notificationRepository.save(PatientPortalNotification.changed(
+                patientId, CHANGED_TITLE, message, appointment.getId(), log.getId(), now));
+    }
+
+    public void createLabResultAvailable(UUID patientId, UUID clinicalResultId, Instant now) {
+        Optional<Patient> patient = patientRepository.findById(patientId);
+        if (patient.isEmpty() || patient.get().getUserId() == null) {
+            return;
+        }
+        if (notificationRepository.existsByPatientIdAndTypeAndClinicalResultId(
+                patientId, PatientPortalNotificationType.LAB_RESULT_AVAILABLE, clinicalResultId)) {
+            return;
+        }
+        notificationRepository.save(PatientPortalNotification.labResultAvailable(
+                patientId, LAB_RESULT_TITLE, LAB_RESULT_MESSAGE, clinicalResultId, now));
+    }
+
+    /**
+     * NCL-14-CN-010 TC-03: notifies both affected accounts that a guardian link should be
+     * reviewed because the dependent has reached adulthood.
+     *
+     * <p>Idempotent per (recipient, dependent) pair through
+     * {@code existsByPatientIdAndTypeAndGuardianReviewDependentPatientId}, so repeated sweeps
+     * never duplicate the reminder. The guardian relationship is intentionally left untouched:
+     * the notification only proposes the review, it never unlinks.</p>
+     *
+     * @param dependent the now-adult dependent whose guardian link is under review
+     * @param now       current instant from {@link com.benhsoan.port.outbound.time.ClockPort}
+     */
+    public void createGuardianLinkReview(Patient dependent, Instant now) {
+        if (dependent == null || dependent.getUserId() == null) {
+            return;
+        }
+        String message = GUARDIAN_REVIEW_MESSAGE.formatted(dependent.getFullName());
+        createGuardianLinkReviewFor(dependent.getId(), dependent.getId(), message, now);
+
+        UUID guardianUserId = dependent.getGuardianUserId();
+        if (guardianUserId != null) {
+            patientRepository.findByUserId(guardianUserId)
+                    .ifPresent(guardian -> createGuardianLinkReviewFor(
+                            guardian.getId(), dependent.getId(), message, now));
+        }
+    }
+
+    private void createGuardianLinkReviewFor(
+            UUID recipientPatientId,
+            UUID dependentPatientId,
+            String message,
+            Instant now
+    ) {
+        if (notificationRepository.existsByPatientIdAndTypeAndGuardianReviewDependentPatientId(
+                recipientPatientId,
+                PatientPortalNotificationType.GUARDIAN_LINK_REVIEW,
+                dependentPatientId)) {
+            return;
+        }
+        notificationRepository.save(PatientPortalNotification.guardianLinkReview(
+                recipientPatientId, GUARDIAN_REVIEW_TITLE, message, dependentPatientId, now));
+    }
+}

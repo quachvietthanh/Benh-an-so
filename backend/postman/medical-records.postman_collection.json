@@ -1,0 +1,238 @@
+{
+  "info": {
+    "name": "Benh So An - Medical Records",
+    "_postman_id": "f2c28d57-1e65-4707-b3bf-2e98c810d013",
+    "description": "Run requests in order against a fresh database migrated through V30.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "adminUsername", "value": "admin" },
+    { "key": "doctorUsername", "value": "doctor1" },
+    { "key": "receptionistUsername", "value": "receptionist1" },
+    { "key": "seededPassword", "value": "password" },
+    { "key": "visitWithoutRecordId", "value": "d0000000-0000-0000-0000-000000000002" },
+    { "key": "seededPatientId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001" },
+    { "key": "accessToken", "value": "" },
+    { "key": "medicalRecordId", "value": "" },
+    { "key": "draftMedicalRecordId", "value": "", "description": "An empty DRAFT/OPEN record for which the logged-in doctor is responsible." },
+    { "key": "templateId", "value": "", "description": "An active template compatible with the draft record visit specialty." },
+    { "key": "primaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000019" },
+    { "key": "secondaryDiagnosisCatalogId", "value": "a1000000-0000-0000-0000-000000000020" }
+  ],
+  "item": [
+    {
+      "name": "Template application (run as responsible doctor on empty draft)",
+      "description": "Template application never overwrites clinical content. Use a DRAFT/OPEN record whose clinical fields are blank, then select an active specialty template or the GENERAL default fallback.",
+      "item": [
+        {
+          "name": "Get available and effective template",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/medical-records/{{draftMedicalRecordId}}/template-options"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Template options are returned', function () { pm.response.to.have.status(200); });",
+            "pm.test('Effective template is resolved', function () { pm.expect(pm.response.json().effectiveTemplate).to.not.eql(null); });"
+          ]}}]
+        },
+        {
+          "name": "Apply template (server resolves immutable current version)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"templateId\": \"{{templateId}}\"\n}" },
+            "url": "{{baseUrl}}/medical-records/{{draftMedicalRecordId}}/template"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Template is applied', function () { pm.response.to.have.status(200); });",
+            "pm.test('Applied immutable version is returned', function () { pm.expect(pm.response.json().appliedTemplate.templateVersionId).to.be.a('string'); });"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "1. Login as Admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "2. Create Medical Record",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"visitId\": \"{{visitWithoutRecordId}}\",\n  \"chiefComplaint\": \"Dau dau tai phat\",\n  \"symptoms\": \"Dau dau nhe\",\n  \"medicalHistory\": \"Khong co benh nen dang ke\",\n  \"physicalExamination\": \"Huyet ap on dinh\",\n  \"clinicalProgress\": \"Dang theo doi\",\n  \"treatmentPlan\": \"Nghi ngoi va theo doi\",\n  \"doctorInstructions\": \"Tai kham neu trieu chung nang hon\",\n  \"conclusion\": \"Chua co dau hieu bat thuong\"\n}" },
+        "url": "{{baseUrl}}/medical-records"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Record is created', function () { pm.response.to.have.status(201); });",
+        "pm.test('Initial status is DRAFT', function () { pm.expect(pm.response.json().status).to.eql('DRAFT'); });",
+        "pm.collectionVariables.set('medicalRecordId', pm.response.json().id);"
+      ]}}]
+    },
+    {
+      "name": "3. Get Medical Record",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Record is returned', function () { pm.response.to.have.status(200); });",
+        "pm.test('Record belongs to seeded visit', function () { pm.expect(pm.response.json().visitId).to.eql(pm.collectionVariables.get('visitWithoutRecordId')); });"
+      ]}}]
+    },
+    {
+      "name": "4. Update Medical Record",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"chiefComplaint\": \"Dau dau tai phat da giam\",\n  \"symptoms\": \"Dau dau nhe\",\n  \"medicalHistory\": \"Khong co benh nen dang ke\",\n  \"physicalExamination\": \"Huyet ap 120/80 mmHg\",\n  \"clinicalProgress\": \"On dinh sau theo doi\",\n  \"treatmentPlan\": \"Tiep tuc nghi ngoi\",\n  \"doctorInstructions\": \"Tai kham neu dau dau tang\",\n  \"conclusion\": \"Da on dinh\"\n}" },
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Update succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.test('Content is updated', function () { pm.expect(pm.response.json().conclusion).to.eql('Da on dinh'); });"
+      ]}}]
+    },
+    {
+      "name": "Diagnosis recording (run after 4, before 5)",
+      "item": [
+        {
+          "name": "Login as Doctor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{doctorUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Doctor login succeeds', function () { pm.response.to.have.status(200); });",
+            "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Replace Diagnoses as Doctor",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"primaryDiagnosis\": {\n    \"diagnosisCatalogId\": \"{{primaryDiagnosisCatalogId}}\",\n    \"note\": \"Mild symptoms\"\n  },\n  \"secondaryDiagnoses\": [\n    {\n      \"diagnosisCatalogId\": \"{{secondaryDiagnosisCatalogId}}\",\n      \"note\": \"Associated fever\"\n    },\n    {\n      \"name\": \"Clinical observation not yet coded\",\n      \"note\": \"Monitor at follow-up\"\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/diagnoses"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Diagnoses are saved', function () { pm.response.to.have.status(200); });",
+            "pm.test('Catalog code is resolved by the server', function () { pm.expect(pm.response.json()[0].diagnosisCode).to.eql('J00'); });",
+            "pm.test('Free-text secondary has no diagnosis code', function () { pm.expect(pm.response.json()[2].diagnosisCode).to.eql(null); });"
+          ]}}]
+        },
+        {
+          "name": "Get Diagnoses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/diagnoses"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Persisted diagnoses are returned', function () { pm.response.to.have.status(200); });",
+            "pm.test('Primary and two secondary diagnoses are returned', function () { pm.expect(pm.response.json()).to.have.length(3); });"
+          ]}}]
+        },
+        {
+          "name": "Restore Admin Session",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Admin login succeeds', function () { pm.response.to.have.status(200); });",
+            "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "5. Lock Medical Record",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/lock"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Lock succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.test('Status is LOCKED', function () { pm.expect(pm.response.json().status).to.eql('LOCKED'); });"
+      ]}}]
+    },
+    {
+      "name": "6. Reject Update After Lock",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"chiefComplaint\": \"Khong duoc phep sua\",\n  \"conclusion\": \"Khong duoc phep sua\"\n}" },
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Locked record rejects update', function () { pm.response.to.have.status(409); });"
+      ]}}]
+    },
+    {
+      "name": "7. Amend Locked Medical Record",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"content\": \"Bo sung benh nhan khong di ung thuoc.\",\n  \"reason\": \"Benh nhan cung cap them thong tin sau khi khoa benh an.\"\n}" },
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/amendments"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Amendment is created', function () { pm.response.to.have.status(201); });",
+        "pm.test('Amendment references current record', function () { pm.expect(pm.response.json().medicalRecordId).to.eql(pm.collectionVariables.get('medicalRecordId')); });"
+      ]}}]
+    },
+    {
+      "name": "8. Get Medical Record Access Logs",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}/access-logs?page=0&size=20"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Access logs are returned', function () { pm.response.to.have.status(200); });",
+        "pm.test('Contains record mutation audit actions', function () { var actions = pm.response.json().content.map(function (item) { return item.action; }); pm.expect(actions).to.include('CREATE'); pm.expect(actions).to.include('UPDATE'); pm.expect(actions).to.include('LOCK'); pm.expect(actions).to.include('AMEND'); });"
+      ]}}]
+    },
+    {
+      "name": "9. Login as Receptionist",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{receptionistUsername}}\",\n  \"password\": \"{{seededPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Receptionist login succeeds', function () { pm.response.to.have.status(200); });",
+        "pm.collectionVariables.set('accessToken', pm.response.json().accessToken);"
+      ]}}]
+    },
+    {
+      "name": "10. Receptionist Cannot Read Medical Record",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+        "url": "{{baseUrl}}/medical-records/{{medicalRecordId}}"
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Receptionist is denied', function () { pm.response.to.have.status(403); });"
+      ]}}]
+    }
+  ]
+}
