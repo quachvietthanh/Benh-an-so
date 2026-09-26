@@ -74,6 +74,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `PUT /system/services/{id}` → `update` | `SERVICE_CATALOG_UPDATE` **AND** `SERVICE_PRICE_MANAGE` | Giá/hiệu lực hợp lệ | Legacy enum permission |
 | `PATCH /system/services/{id}/status` → `updateStatus` | `SERVICE_CATALOG_UPDATE` | Không vô hiệu hóa trái rule catalogue | Legacy enum permission |
 | `GET /dashboard/operational` → `OperationalDashboardController.getOperational` | `NEW: DASHBOARD_OPERATIONAL_READ` | Khoảng ngày và aggregate scope | New catalog; service role rule phải tách |
+| `GET /dashboard/doctor` → `DoctorDashboardController.getDoctorDashboard` | `NEW: DASHBOARD_DOCTOR_READ` | Bác sĩ chỉ xem dữ liệu của chính mình (AC-02, QTN-01); lọc theo ngày | Implemented — NCL-08-CN-010 |
 | `POST /follow-up-reminders`; `PATCH /follow-up-reminders/{id}/status` | `NEW: FOLLOW_UP_REMINDER_CREATE` / `NEW: FOLLOW_UP_REMINDER_UPDATE` | Rule due date/status; receptionist workflow | New catalog + service context |
 | `GET /follow-up-reminders`, `/due` | `NEW: FOLLOW_UP_REMINDER_READ` | Filter due/status | New catalog + service context |
 | `POST /care-logs`; `GET /care-logs`, `/patient/{patientId}` | `NEW: CARE_LOG_CREATE` / `NEW: CARE_LOG_READ` | Giữ staff/clinical context và audit actor | New catalog + service context |
