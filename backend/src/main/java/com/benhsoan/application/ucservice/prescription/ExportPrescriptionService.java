@@ -31,7 +31,6 @@ import com.benhsoan.port.outbound.time.ClockPort;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class ExportPrescriptionService implements ExportPrescriptionUseCase {
 
@@ -42,11 +41,53 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
     private final PrescriptionReadAccessValidator accessValidator;
     private final PrescriptionDisplayContextResolver displayContextResolver;
     private final ClinicConfigurationRepository clinicConfigurationRepository;
+    private final com.benhsoan.port.outbound.repository.clinic.DocumentPrintTemplateRepository documentPrintTemplateRepository;
     private final PrescriptionPdfRenderer pdfRenderer;
     private final CurrentUserPort currentUserPort;
     private final AuditLogRepository auditLogRepository;
     private final ClockPort clockPort;
     private final AnonymizationModeState anonymizationModeState;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExportPrescriptionService(
+            PrescriptionRepository prescriptionRepository,
+            PrescriptionReadAccessValidator accessValidator,
+            PrescriptionDisplayContextResolver displayContextResolver,
+            ClinicConfigurationRepository clinicConfigurationRepository,
+            com.benhsoan.port.outbound.repository.clinic.DocumentPrintTemplateRepository documentPrintTemplateRepository,
+            PrescriptionPdfRenderer pdfRenderer,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            AnonymizationModeState anonymizationModeState
+    ) {
+        this.prescriptionRepository = prescriptionRepository;
+        this.accessValidator = accessValidator;
+        this.displayContextResolver = displayContextResolver;
+        this.clinicConfigurationRepository = clinicConfigurationRepository;
+        this.documentPrintTemplateRepository = documentPrintTemplateRepository;
+        this.pdfRenderer = pdfRenderer;
+        this.currentUserPort = currentUserPort;
+        this.auditLogRepository = auditLogRepository;
+        this.clockPort = clockPort;
+        this.anonymizationModeState = anonymizationModeState;
+    }
+
+    public ExportPrescriptionService(
+            PrescriptionRepository prescriptionRepository,
+            PrescriptionReadAccessValidator accessValidator,
+            PrescriptionDisplayContextResolver displayContextResolver,
+            ClinicConfigurationRepository clinicConfigurationRepository,
+            PrescriptionPdfRenderer pdfRenderer,
+            CurrentUserPort currentUserPort,
+            AuditLogRepository auditLogRepository,
+            ClockPort clockPort,
+            AnonymizationModeState anonymizationModeState
+    ) {
+        this(prescriptionRepository, accessValidator, displayContextResolver,
+                clinicConfigurationRepository, null, pdfRenderer,
+                currentUserPort, auditLogRepository, clockPort, anonymizationModeState);
+    }
 
     @Override
     public PrescriptionPrintResult export(UUID prescriptionId) {
@@ -123,6 +164,17 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
         requireText(clinic.getClinicName(), "Clinic name is required for printing.");
         requireText(clinic.getAddress(), "Clinic address is required for printing.");
         requireText(clinic.getPhone(), "Clinic phone is required for printing.");
+
+        var template = documentPrintTemplateRepository != null
+                ? documentPrintTemplateRepository.findByDocumentType(com.benhsoan.domain.clinic.enums.PrintDocumentType.PRESCRIPTION).orElse(null)
+                : null;
+        String title = template != null ? template.getTitle() : null;
+        String logoUrl = template != null ? template.getLogoUrl() : null;
+        String legalInfo = template != null ? template.getLegalInfo() : null;
+        String footerText = template != null ? template.getFooterText() : null;
+        boolean showLogo = template == null || template.isShowLogo();
+        String fieldVisibility = template != null ? template.getFieldVisibility() : null;
+
         return new PrescriptionPrintDocument(
                 clinic.getClinicName(), clinic.getAddress(), clinic.getPhone(),
                 prescription.getPrescriptionCode(), context.patientId(), context.patientCode(),
@@ -133,7 +185,8 @@ public class ExportPrescriptionService implements ExportPrescriptionUseCase {
                                 item.getMedicineName(), item.getStrength(), item.getUnit(),
                                 item.getDosage(), item.getFrequency(), item.getDurationDays(),
                                 item.getRoute(), item.getQuantity(), item.getInstructions()))
-                        .toList()
+                        .toList(),
+                title, logoUrl, legalInfo, footerText, showLogo, fieldVisibility
         );
     }
 
