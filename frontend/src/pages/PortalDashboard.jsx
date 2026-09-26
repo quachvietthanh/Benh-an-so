@@ -18,6 +18,7 @@ import {
   ScheduleOutlined,
   FileDoneOutlined,
   FileProtectOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { useAuthContext } from '../context/AuthContext'
 import PatientNotificationBell from '../components/portal/PatientNotificationBell.jsx'
@@ -220,6 +221,28 @@ function PortalDashboard() {
               <Link to="/portal/my-invoices" style={{ width: '100%', display: 'block' }}>
                 <Button className="portal-btn-outline" block>
                   Xem danh sách hóa đơn <ArrowRightOutlined />
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="portal-dashboard-card portal-card-clinical-results" style={{ borderColor: '#bfdbfe' }}>
+            <div className="portal-dashboard-card-top">
+              <div className="portal-dashboard-card-icon blue" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+                <ExperimentOutlined />
+              </div>
+              <div className="portal-card-header-text">
+                <h3>Kết quả cận lâm sàng</h3>
+                <span className="portal-card-tag green">Đã xác nhận</span>
+              </div>
+            </div>
+            <p className="portal-card-desc">
+              Xem lại kết quả xét nghiệm, chẩn đoán hình ảnh chính thức và tải bản đọc được (PDF) khi cần lưu trữ hoặc tái khám.
+            </p>
+            <div className="portal-card-action">
+              <Link to="/portal/my-clinical-results" style={{ width: '100%', display: 'block' }}>
+                <Button className="portal-btn-outline" block>
+                  Xem kết quả cận lâm sàng <ArrowRightOutlined />
                 </Button>
               </Link>
             </div>

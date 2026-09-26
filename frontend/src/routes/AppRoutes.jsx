@@ -16,6 +16,7 @@ const PatientPortalBookingPage = React.lazy(() => import('../pages/PatientPortal
 const PatientMyAppointmentsPage = React.lazy(() => import('../pages/PatientMyAppointmentsPage'))
 const PatientMedicalHistoryPage = React.lazy(() => import('../pages/PatientMedicalHistoryPage'))
 const PatientMyInvoicesPage = React.lazy(() => import('../pages/PatientMyInvoicesPage'))
+const PatientMyClinicalResultsPage = React.lazy(() => import('../pages/PatientMyClinicalResultsPage'))
 const Dashboard = React.lazy(() => import('../pages/Dashboard'))
 const PatientList = React.lazy(() => import('../pages/PatientList'))
 const PatientImportPage = React.lazy(() => import('../pages/PatientImportPage'))
@@ -28,6 +29,7 @@ const PharmacyPage = React.lazy(() => import('../pages/PharmacyPage'))
 const InventoryReceiptPage = React.lazy(() => import('../pages/InventoryReceiptPage'))
 const MedicineCatalogPage = React.lazy(() => import('../pages/MedicineCatalogPage'))
 const SpecialControlledDrugRegisterPage = React.lazy(() => import('../pages/SpecialControlledDrugRegisterPage'))
+const MedicationProcurementPage = React.lazy(() => import('../pages/MedicationProcurementPage'))
 const BillingPage = React.lazy(() => import('../pages/BillingPage'))
 const UnpaidVisitsPage = React.lazy(() => import('../pages/UnpaidVisitsPage'))
 const InvoiceLookupPage = React.lazy(() => import('../pages/InvoiceLookupPage'))
@@ -130,6 +132,8 @@ function AppRoutes() {
       <Route path="/portal/medical-history" element={<PatientRoute><LazyPage><PatientMedicalHistoryPage /></LazyPage></PatientRoute>} />
       <Route path="/portal/my-invoices" element={<PatientRoute><LazyPage><PatientMyInvoicesPage /></LazyPage></PatientRoute>} />
       <Route path="/portal/invoices" element={<Navigate to="/portal/my-invoices" replace />} />
+      <Route path="/portal/my-clinical-results" element={<PatientRoute><LazyPage><PatientMyClinicalResultsPage /></LazyPage></PatientRoute>} />
+      <Route path="/portal/clinical-results" element={<Navigate to="/portal/my-clinical-results" replace />} />
       <Route path="/public-lookup" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/portal" element={<LazyPage><PublicLookupPage /></LazyPage>} />
       <Route path="/tra-cuu-ket-qua" element={<LazyPage><PublicLookupPage /></LazyPage>} />
@@ -178,6 +182,9 @@ function AppRoutes() {
         <Route path="special-controlled-drugs" element={<Navigate to="/pharmacy/special-control-register" replace />} />
         <Route path="medicines" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
         <Route path="medicine-catalog" element={<PrivateRoute allowedPermissions={['PHARMACY_READ', 'PHARMACY_CREATE', 'PHARMACY_UPDATE']} allowedRoles={['admin', 'pharmacist']}><LazyPage><MedicineCatalogPage /></LazyPage></PrivateRoute>} />
+        <Route path="pharmacy/procurement-plans" element={<PrivateRoute allowedPermissions={['MEDICATION_PROCUREMENT_READ']} allowedRoles={['admin', 'pharmacist', 'manager', 'clinic_manager']}><LazyPage><MedicationProcurementPage /></LazyPage></PrivateRoute>} />
+        <Route path="procurement-plans" element={<Navigate to="/pharmacy/procurement-plans" replace />} />
+        <Route path="inventory/procurements" element={<Navigate to="/pharmacy/procurement-plans" replace />} />
         <Route path="billing" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE', 'INVOICE_UPDATE']} allowedRoles={['admin', 'manager', 'receptionist']}><LazyPage><BillingPage /></LazyPage></PrivateRoute>} />
         <Route path="billing/unpaid-visits" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_CREATE']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><UnpaidVisitsPage /></LazyPage></PrivateRoute>} />
         <Route path="invoices/discount-requests" element={<PrivateRoute allowedPermissions={['INVOICE_READ', 'INVOICE_UPDATE', 'INVOICE_CREATE']} allowedRoles={['admin', 'manager', 'clinic_manager', 'receptionist']}><LazyPage><DiscountRequestManagementPage /></LazyPage></PrivateRoute>} />

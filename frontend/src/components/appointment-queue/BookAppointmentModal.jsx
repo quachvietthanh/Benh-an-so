@@ -12,7 +12,7 @@ import {
   Space,
   TimePicker,
 } from 'antd'
-import { UserAddOutlined } from '@ant-design/icons'
+import { UserAddOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 
 export default function BookAppointmentModal({
@@ -24,6 +24,7 @@ export default function BookAppointmentModal({
   doctorList = [],
   actionLoading = false,
   onOpenQuickPatient,
+  onOpenWaitlist,
 }) {
   return (
     <Modal
@@ -122,6 +123,22 @@ export default function BookAppointmentModal({
 
         <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
           <Space>
+            {onOpenWaitlist && (
+              <Button
+                type="dashed"
+                icon={<ClockCircleOutlined />}
+                onClick={() => {
+                  const values = form.getFieldsValue()
+                  onOpenWaitlist({
+                    patientId: values.patientId,
+                    doctorId: values.doctorId,
+                    desiredDate: values.appointmentDate,
+                  })
+                }}
+              >
+                Kín lịch? Vào danh sách chờ
+              </Button>
+            )}
             <Button onClick={onCancel}>Hủy</Button>
             <Button type="primary" htmlType="submit" loading={actionLoading}>
               Xác nhận Đặt Lịch Hẹn

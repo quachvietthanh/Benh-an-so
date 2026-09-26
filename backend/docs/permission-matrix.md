@@ -34,7 +34,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `POST /medical-records/export`, `GET /medical-records/{id}/export` → `exportRecords`, `exportSingleRecord` | `MEDICAL_RECORD_EXPORT` | NCL-11-CN-007: ADMIN, MANAGER; hồ sơ phải ở trạng thái đã ký (SIGNED, LOCKED, ARCHIVED) theo QTN-41; chẩn đoán chính gắn mã bệnh theo QTN-22; xuất tệp JSON cấu trúc chuẩn 5 khối; audit log lưu người xuất, phạm vi lượt khám và thời điểm. | V90 |
 | `POST /prescriptions` → `create` | `PRESCRIPTION_CREATE` | Chỉ bác sĩ phụ trách medical record/visit; kiểm tra tương tác và trạng thái | Permission + service context |
 | `PATCH /prescriptions/{id}` → `update`; `POST /prescriptions/{id}/cancel` → `cancel` | `PRESCRIPTION_UPDATE` | Chỉ bác sĩ phụ trách visit; không sửa khi trạng thái không cho phép | Permission + service context |
-| `GET /prescriptions`, `/{id}`, `/medical-records/{medicalRecordId}` → read methods | `PRESCRIPTION_READ` | DOCTOR chỉ đọc prescription của visit mình phụ trách; admin/pharmacist theo service | Permission + service context |
+| `GET /prescriptions`, `/{id}`, `/code/{prescriptionCode}`, `/medical-records/{medicalRecordId}` → read methods | `PRESCRIPTION_READ` | NCL-12-CN-006: Tra cứu đơn thuốc bằng mã đơn khi cấp phát. DOCTOR chỉ đọc prescription của visit mình phụ trách; admin/pharmacist theo service | Permission + service context |
 | `POST /prescriptions/{id}/dispense` → `dispense` | `PRESCRIPTION_UPDATE_STATUS` | Chỉ trạng thái có thể dispense; tồn kho/lot hợp lệ | Chuyển role tổng quát, giữ service context |
 | `POST /prescriptions/check-interactions` → `checkInteractions` | `PRESCRIPTION_CREATE` | Chỉ kiểm tra lâm sàng, không ghi đơn | Chuyển từ role |
 | `POST /prescription-templates` → `save` | `PRESCRIPTION_CREATE` | NCL-05-CN-008: chỉ `DOCTOR`; đơn thuốc nguồn thuộc về bác sĩ đang thao tác và không bị hủy (`PENDING_DISPENSE`/`PARTIALLY_DISPENSED`/`DISPENSED`); chẩn đoán phải thuộc bệnh án của đơn thuốc nguồn | Implemented — NCL-05-CN-008 |
@@ -74,6 +74,7 @@ Nguồn: controller, `SecurityConfig` và service authorization hiện tại. `T
 | `PUT /system/services/{id}` → `update` | `SERVICE_CATALOG_UPDATE` **AND** `SERVICE_PRICE_MANAGE` | Giá/hiệu lực hợp lệ | Legacy enum permission |
 | `PATCH /system/services/{id}/status` → `updateStatus` | `SERVICE_CATALOG_UPDATE` | Không vô hiệu hóa trái rule catalogue | Legacy enum permission |
 | `GET /dashboard/operational` → `OperationalDashboardController.getOperational` | `NEW: DASHBOARD_OPERATIONAL_READ` | Khoảng ngày và aggregate scope | New catalog; service role rule phải tách |
+| `GET /dashboard/doctor` → `DoctorDashboardController.getDoctorDashboard` | `NEW: DASHBOARD_DOCTOR_READ` | Bác sĩ chỉ xem dữ liệu của chính mình (AC-02, QTN-01); lọc theo ngày | Implemented — NCL-08-CN-010 |
 | `POST /follow-up-reminders`; `PATCH /follow-up-reminders/{id}/status` | `NEW: FOLLOW_UP_REMINDER_CREATE` / `NEW: FOLLOW_UP_REMINDER_UPDATE` | Rule due date/status; receptionist workflow | New catalog + service context |
 | `GET /follow-up-reminders`, `/due` | `NEW: FOLLOW_UP_REMINDER_READ` | Filter due/status | New catalog + service context |
 | `POST /care-logs`; `GET /care-logs`, `/patient/{patientId}` | `NEW: CARE_LOG_CREATE` / `NEW: CARE_LOG_READ` | Giữ staff/clinical context và audit actor | New catalog + service context |
