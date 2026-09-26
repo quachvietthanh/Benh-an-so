@@ -55,7 +55,7 @@ authoritative business source (Sheet "Product Backlog" R140, "Tasks" R641–R645
 
 ## Data model
 
-Table `personal_data_requests` (Flyway `V106`):
+Table `personal_data_requests` (Flyway `V108`):
 
 | Column | Type | Notes |
 |---|---|---|

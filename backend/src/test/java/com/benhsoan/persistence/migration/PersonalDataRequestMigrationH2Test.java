@@ -23,7 +23,7 @@ import org.h2.tools.RunScript;
 import org.junit.jupiter.api.Test;
 
 /**
- * Executes the schema portion of the V106 migration (table + indexes) against an
+ * Executes the schema portion of the V108 migration (table + indexes) against an
  * in-memory H2 database to prove the DDL is H2-compatible and enforces the status
  * CHECK and patient/processor foreign keys. The permission-seeding portion uses
  * MySQL {@code UUID_TO_BIN(UUID())} and is therefore exercised only by the
@@ -33,14 +33,14 @@ import org.junit.jupiter.api.Test;
 class PersonalDataRequestMigrationH2Test {
 
     @Test
-    void v106DdlRunsAndEnforcesConstraintsOnH2() throws Exception {
+    void v108DdlRunsAndEnforcesConstraintsOnH2() throws Exception {
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:h2:mem:v106;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
+                "jdbc:h2:mem:v108;DB_CLOSE_DELAY=-1;MODE=LEGACY", "sa", "")) {
             Statement stmt = conn.createStatement();
             stmt.execute("CREATE TABLE patients (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
             stmt.execute("CREATE TABLE users (id BINARY(16) NOT NULL, PRIMARY KEY (id))");
 
-            String ddl = readResource("db/migration/V106__create_personal_data_requests_table.sql");
+            String ddl = readResource("db/migration/V108__create_personal_data_requests_table.sql");
             RunScript.execute(conn, new StringReader(schemaOnly(ddl)));
 
             UUID patientId = UUID.randomUUID();

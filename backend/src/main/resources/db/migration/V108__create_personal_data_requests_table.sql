@@ -1,5 +1,5 @@
 -- =====================================================
--- V106__create_personal_data_requests_table.sql
+-- V108__create_personal_data_requests_table.sql
 -- NCL-15-CN-006: Tiếp nhận và xử lý yêu cầu về dữ liệu cá nhân
 -- Lưu vết yêu cầu của người bệnh (loại yêu cầu, ngày tiếp nhận,
 -- hạn xử lý, trạng thái, kết quả, người xử lý) để quản trị viên
